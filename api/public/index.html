@@ -105,8 +105,8 @@ dialog.pq{width:min(420px,95vw)}
 </section>
 
 <section id="p-fer" class="hide">
-<div class="bar"><button class="sec" id="fVenc">Vencimentos SST</button><label>Buscar<input id="fBusca" placeholder="ex.: rescisão, INSS, DAS..." size="26"></label><label>Subgrupo<select id="fCat"></select></label><label>Tipo<select id="fTipo"><option value="">Todos</option><option value="calc">Cálculos</option><option value="registro">Registros / controles</option></select></label><button class="sec" id="fLimpar" title="Limpar filtros">Limpar</button><span class="mut" id="fQtd"></span></div>
-<div class="sem" id="fAreas"></div>
+<div class="bar"><button class="sec" id="fVenc">Vencimentos SST</button><label>Buscar<input id="fBusca" placeholder="ex.: rescisão, INSS, DAS..." size="26"></label><select id="fCat" class="hide"></select><label>Ordenar<select id="fOrd"><option value="sub">Subgrupo, depois A–Z</option><option value="az">Nome A–Z</option><option value="za">Nome Z–A</option><option value="tipo">Tipo (cálculo/registro)</option></select></label><label>Tipo<select id="fTipo"><option value="">Todos</option><option value="calc">Cálculos</option><option value="registro">Registros / controles</option></select></label><button class="sec" id="fLimpar" title="Limpar filtros">Limpar</button><span class="mut" id="fQtd"></span></div>
+<div class="sem" id="fAreas"></div><div class="sem" id="fSubs" style="gap:6px"></div>
 <div id="fLista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px"></div>
 </section>
 
@@ -371,7 +371,7 @@ const FMT={brl:v=>'R$ '+money(v),pct:v=>(Number(v)*100).toLocaleString('pt-BR',{
 const areaDe=c=>/^SST/.test(c)?'SST':(/^(DP|RH)/.test(c)||['Folha e DP','Rescisão e férias'].includes(c))?'DP e RH':/^Fiscal/.test(c)?'Fiscal e contábil':'Outros';
 const subDe=c=>c.replace(/^(SST|DP|RH|Fiscal) · /,'');
 let FAREA='';const ACOR={SST:'#dc2626','DP e RH':'#2563eb','Fiscal e contábil':'#16a34a',Outros:'#6b7280'};
-async function carregarFerr(){try{await empresas(true);await garantirFerr();if(!$('fCat').dataset.ok){$('fCat').dataset.ok='1';$('fBusca').oninput=$('fCat').onchange=$('fTipo').onchange=listarFerr;$('fLimpar').onclick=()=>{FAREA='';$('fBusca').value='';$('fTipo').value='';$('fCat').value='';listarFerr()}}listarFerr()}catch(e){err(e)}}
+async function carregarFerr(){try{await empresas(true);await garantirFerr();if(!$('fCat').dataset.ok){$('fCat').dataset.ok='1';$('fBusca').oninput=$('fCat').onchange=$('fTipo').onchange=$('fOrd').onchange=listarFerr;$('fLimpar').onclick=()=>{FAREA='';$('fBusca').value='';$('fTipo').value='';$('fCat').value='';$('fOrd').value='sub';listarFerr()}}listarFerr()}catch(e){err(e)}}
 function listarFerr(){const q=$('fBusca').value.toLowerCase(),tp=$('fTipo').value,tipoDe=f=>f.tipo==='registro'?'registro':'calc';
  // áreas (SST, DP e RH, ...) com contagem; o subgrupo só lista os grupos da área escolhida
  const areas=['DP e RH','SST','Fiscal e contábil','Outros'].filter(a=>FERR.some(f=>areaDe(f.cat)===a));
@@ -379,7 +379,12 @@ function listarFerr(){const q=$('fBusca').value.toLowerCase(),tp=$('fTipo').valu
  $('fAreas').replaceChildren(el('button',{className:FAREA?'sec sm':'sm',textContent:'Todas ('+base.length+')',onclick:()=>{FAREA='';$('fCat').value='';listarFerr()}}),...areas.map(a=>el('button',{className:'sm',style:FAREA===a?'background:'+ACOR[a]+';color:#fff;border:2px solid '+ACOR[a]+';font-weight:700':'background:#fff;color:'+ACOR[a]+';border:2px solid '+ACOR[a],textContent:a+' ('+base.filter(f=>areaDe(f.cat)===a).length+')',onclick:()=>{FAREA=a;$('fCat').value='';listarFerr()}})));
  const grupos=[...new Set(FERR.filter(f=>!FAREA||areaDe(f.cat)===FAREA).map(f=>f.cat))],cur=$('fCat').value;
  $('fCat').replaceChildren(el('option',{value:'',textContent:FAREA?'Todos de '+FAREA:'Todos os subgrupos'}),...grupos.map(g=>el('option',{value:g,textContent:subDe(g)+' ('+base.filter(f=>f.cat===g).length+')'})));$('fCat').value=grupos.includes(cur)?cur:'';
- const c=$('fCat').value;const l=base.filter(f=>(!FAREA||areaDe(f.cat)===FAREA)&&(!c||f.cat===c));$('fQtd').textContent=l.length+' de '+FERR.length+' ferramentas';
+ const ORD_AREA=['DP e RH','SST','Fiscal e contábil','Outros'];
+ const subs=[...new Set(FERR.filter(f=>!FAREA||areaDe(f.cat)===FAREA).map(f=>f.cat))].sort((a,b)=>ORD_AREA.indexOf(areaDe(a))-ORD_AREA.indexOf(areaDe(b))||subDe(a).localeCompare(subDe(b),'pt-BR'));
+ $('fSubs').replaceChildren(...subs.map(g=>{const n=base.filter(f=>f.cat===g).length,cor=ACOR[areaDe(g)],on=$('fCat').value===g;return el('button',{className:'sm',disabled:!n&&!on,style:(on?'background:'+cor+';color:#fff;':'background:'+cor+'14;color:'+cor+';')+'border:1px solid '+cor+';border-radius:999px;padding:3px 10px;font-size:12px;'+(n||on?'':'opacity:.4'),textContent:(FAREA?'':areaDe(g)+' · ')+subDe(g)+' ('+n+')',onclick:()=>{$('fCat').value=on?'':g;listarFerr()}})}));
+ const c=$('fCat').value;const l=base.filter(f=>(!FAREA||areaDe(f.cat)===FAREA)&&(!c||f.cat===c));
+ const o=$('fOrd').value,pt=(a,b)=>a.nome.localeCompare(b.nome,'pt-BR');
+ l.sort(o==='az'?pt:o==='za'?(a,b)=>pt(b,a):o==='tipo'?(a,b)=>(a.tipo==='registro')-(b.tipo==='registro')||pt(a,b):(a,b)=>ORD_AREA.indexOf(areaDe(a.cat))-ORD_AREA.indexOf(areaDe(b.cat))||subDe(a.cat).localeCompare(subDe(b.cat),'pt-BR')||pt(a,b));$('fQtd').textContent=l.length+' de '+FERR.length+' ferramentas';
  $('fLista').replaceChildren(...(l.length?l.map(f=>{const d=el('div',{className:'card',style:'cursor:pointer;margin:0;border-left:4px solid '+(ACOR[areaDe(f.cat)])+';background:'+ACOR[areaDe(f.cat)]+'0d',onclick:()=>abrirFerr(f)});d.append(el('div',{style:'font-size:12px;font-weight:600;color:'+ACOR[areaDe(f.cat)]},areaDe(f.cat)+' › '+subDe(f.cat)+' ',el('span',{className:'tag',textContent:f.tipo==='registro'?'registro':'cálculo'})),el('b',{textContent:f.nome}),el('div',{className:'mut',textContent:f.desc,style:'font-size:13px;margin-top:4px'}));return d}):[el('p',{className:'mut',textContent:'Nenhuma ferramenta com esses filtros.'})]))}
 const AUTO={salario:'salario',base:'salario',bruto:'salario',prolabore:'salario',remun:'salario',adm:'data_admissao',nasc:'data_nascimento',deps:'dependentes',doc:'cpf',jornada:null,cargo:'cargo_nome'};
 function pickerFunc(onSel){const se=el('select',{},...optsEmp('— empresa —'));const sf=el('select',{},el('option',{value:'',textContent:'— funcionário (opcional) —'}));let lista=[];
