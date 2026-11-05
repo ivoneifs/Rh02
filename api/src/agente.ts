@@ -3,7 +3,7 @@
 //  2) empresa/tenant vêm do contexto da requisição, NUNCA dos argumentos do modelo (impede ler outra empresa por prompt injection).
 //  3) Resultados de ferramentas são DADOS, não instruções (descrição de extrato pode conter texto malicioso).
 //  4) Teto de rodadas, de tamanho de resultado e de tokens/mês.
-export interface Msg { role: 'system' | 'user' | 'assistant' | 'tool'; content?: string | null; tool_calls?: any[]; tool_call_id?: string }
+export interface Msg { role: 'system' | 'user' | 'assistant' | 'tool'; content?: string | any[] | null; tool_calls?: any[]; tool_call_id?: string }
 export interface Ferramenta { name: string; description: string; parameters: Record<string, unknown>; exec(args: any): Promise<unknown> }
 export class ErroLLM extends Error { status: number; constructor(status: number, msg: string) { super(msg); this.status = status; } }
 

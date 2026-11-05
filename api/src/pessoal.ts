@@ -11,7 +11,7 @@ export const CAMPOS_FUNC: F[] = [
   { k: 'data_nascimento', t: 'date' }, { k: 'sexo', t: 'enum', op: ['M', 'F', 'O'] }, { k: 'rg', t: 'txt', max: 30 }, { k: 'pis_nis', t: 'pis' }, { k: 'ctps', t: 'txt', max: 40 },
   { k: 'estado_civil', t: 'enum', op: ['SOLTEIRO', 'CASADO', 'UNIAO_ESTAVEL', 'SEPARADO', 'DIVORCIADO', 'VIUVO'] },
   { k: 'escolaridade', t: 'enum', op: ['FUNDAMENTAL_INCOMPLETO', 'FUNDAMENTAL', 'MEDIO_INCOMPLETO', 'MEDIO', 'TECNICO', 'SUPERIOR_INCOMPLETO', 'SUPERIOR', 'POS_GRADUACAO'] },
-  { k: 'telefone', t: 'txt', max: 30 }, { k: 'email', t: 'email' }, { k: 'cep', t: 'cep' }, { k: 'logradouro', t: 'txt', max: 150 }, { k: 'numero', t: 'txt', max: 20 }, { k: 'complemento', t: 'txt', max: 80 },
+  { k: 'telefone', t: 'txt', max: 30 }, { k: 'whatsapp', t: 'txt', max: 30 }, { k: 'email', t: 'email' }, { k: 'cep', t: 'cep' }, { k: 'logradouro', t: 'txt', max: 150 }, { k: 'numero', t: 'txt', max: 20 }, { k: 'complemento', t: 'txt', max: 80 },
   { k: 'bairro', t: 'txt', max: 80 }, { k: 'cidade', t: 'txt', max: 80 }, { k: 'uf', t: 'uf' },
   { k: 'data_admissao', t: 'date', req: true }, { k: 'data_demissao', t: 'date' }, { k: 'cargo_id', t: 'uuid' }, { k: 'ambiente_id', t: 'uuid' }, { k: 'funcao', t: 'txt', max: 100 }, { k: 'setor', t: 'txt', max: 100 },
   { k: 'cbo', t: 'txt', max: 6 }, { k: 'salario', t: 'num', min: 0, maxv: 1e9 }, { k: 'jornada_semanal', t: 'num', min: 0, maxv: 80 }, { k: 'tipo_contrato', t: 'enum', op: CONTRATOS },

@@ -19,6 +19,7 @@ import { simular, explicar } from './simulacao.ts';
 import * as sugestao from './sugestao.ts';
 import { TERMOS } from './glossario.ts';
 import * as anexos from './anexos.ts';
+import * as docsf from './docs-rotas.ts';
 import { controle as controleSst } from './controle.ts';
 import { exemploDoModelo } from './exemplos.ts';
 import { calcular as calcularHolerite } from './holerite.ts';
@@ -79,7 +80,7 @@ const server = http.createServer(async (req, res) => {
 
     let m: RegExpExecArray | null;
     // Ferramentas de cálculo (qualquer papel logado) e Normas (leitura: todos; alteração: ADMIN)
-    if (p.startsWith('/v1/ferramentas') || p.startsWith('/v1/modelos') || p.startsWith('/v1/holerite') || p.startsWith('/v1/anexos') || p === '/v1/glossario' || p === '/v1/semaforo' || p === '/v1/sugestao/condicoes' || /^\/v1\/registros\/[^/]+\/analisar$/.test(p) || p.startsWith('/v1/normas') || p.startsWith('/v1/registros') || p.startsWith('/v1/funcionarios') || p.startsWith('/v1/cargos') || p.startsWith('/v1/ambientes') || /^\/v1\/empresas\/[^/]+\/(funcionarios|cargos|ambientes)$/.test(p)) {
+    if (p.startsWith('/v1/ferramentas') || p.startsWith('/v1/modelos') || p.startsWith('/v1/holerite') || p.startsWith('/v1/anexos') || p.startsWith('/v1/docs') || /^\/v1\/empresas\/[^/]+\/docs-resumo$/.test(p) || p === '/v1/glossario' || p === '/v1/semaforo' || p === '/v1/sugestao/condicoes' || /^\/v1\/registros\/[^/]+\/analisar$/.test(p) || p.startsWith('/v1/normas') || p.startsWith('/v1/registros') || p.startsWith('/v1/funcionarios') || p.startsWith('/v1/cargos') || p.startsWith('/v1/ambientes') || /^\/v1\/empresas\/[^/]+\/(funcionarios|cargos|ambientes)$/.test(p)) {
       const s = await auth.sessaoDe(req); if (!s) return json(res, 401, { erro: 'não autenticado' });
       const corpo = async () => JSON.parse(await lerCorpo(req, 200_000));
       const qp = url.searchParams;
@@ -95,6 +96,18 @@ const server = http.createServer(async (req, res) => {
         if (req.method !== 'GET' && new RegExp(`^/v1/(empresas/[^/]+/)?${rota}(/|$)`).test(p) && s.papel !== 'ADMIN') return json(res, 403, { erro: 'Apenas administradores alteram cargos e ambientes (configuração).' });
         if ((m = new RegExp(`^/v1/empresas/([^/]+)/${rota}$`).exec(p))) { if (req.method === 'GET') return json(res, 200, await mod.listar(s, m[1])); if (req.method === 'POST') return json(res, 201, await mod.criar(s, m[1], await corpo())); }
         if ((m = new RegExp(`^/v1/${rota}/([^/]+)$`).exec(p))) { if (req.method === 'PATCH') return json(res, 200, await mod.editar(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await mod.excluir(s, m[1])); }
+      }
+      if ((m = /^\/v1\/funcionarios\/([^/]+)\/docs$/.exec(p))) {
+        if (req.method === 'GET') return json(res, 200, await docsf.checklist(s, m[1]));
+        if (req.method === 'POST') return json(res, 201, await docsf.enviar(s, m[1], JSON.parse(await lerCorpo(req, 9_000_000))));
+      }
+      if ((m = /^\/v1\/funcionarios\/([^/]+)\/docs\.zip$/.exec(p)) && req.method === 'GET') { const z = await docsf.zipPasta(s, m[1]); res.writeHead(200, { 'content-type': 'application/zip', 'content-length': z.dados.length, 'content-disposition': `attachment; filename="${z.nome}"`, 'x-content-type-options': 'nosniff', 'cache-control': 'no-store' }); return res.end(z.dados); }
+      if ((m = /^\/v1\/empresas\/([^/]+)\/docs-resumo$/.exec(p)) && req.method === 'GET') return json(res, 200, await docsf.resumoEmpresa(s, m[1]));
+      if ((m = /^\/v1\/docs\/([^/]+)\/analisar$/.exec(p)) && req.method === 'POST') return json(res, 200, await docsf.analisar(s, m[1]));
+      if ((m = /^\/v1\/docs\/([^/]+)$/.exec(p))) {
+        if (req.method === 'GET') { const f = await docsf.obter(s, m[1]); res.writeHead(200, { 'content-type': f.mime, 'content-length': f.dados.length, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox", 'content-disposition': 'inline' }); return res.end(f.dados); }
+        if (req.method === 'PATCH') return json(res, 200, await docsf.editar(s, m[1], (await corpo()) ?? {}));
+        if (req.method === 'DELETE') return json(res, 200, await docsf.excluir(s, m[1]));
       }
       if (p === '/v1/anexos' && req.method === 'POST') return json(res, 201, await anexos.enviar(s, JSON.parse(await lerCorpo(req, 3_500_000))));
       if (p === '/v1/anexos' && req.method === 'GET') return json(res, 200, await anexos.listar(s, qp.get('alvo_tipo') ?? '', qp.get('alvo_id') ?? ''));
