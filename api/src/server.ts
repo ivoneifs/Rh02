@@ -73,6 +73,7 @@ const server = http.createServer(async (req, res) => {
       if ((m = /^\/v1\/empresas\/([^/]+)\/funcionarios$/.exec(p))) { if (req.method === 'GET') return json(res, 200, await pessoal.listarFuncionarios(s, m[1], qp.get('q') ?? undefined, qp.get('ativos') === '1')); if (req.method === 'POST') return json(res, 201, await pessoal.criarFuncionario(s, m[1], await corpo())); }
       if ((m = /^\/v1\/funcionarios\/([^/]+)$/.exec(p))) { if (req.method === 'GET') return json(res, 200, await pessoal.obterFuncionario(s, m[1])); if (req.method === 'PATCH') return json(res, 200, await pessoal.editarFuncionario(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await pessoal.excluirFuncionario(s, m[1])); }
       for (const [rota, mod] of [['cargos', pessoal.cargos], ['ambientes', pessoal.ambientes]] as const) {
+        if (req.method !== 'GET' && new RegExp(`^/v1/(empresas/[^/]+/)?${rota}(/|$)`).test(p) && s.papel !== 'ADMIN') return json(res, 403, { erro: 'Apenas administradores alteram cargos e ambientes (configuração).' });
         if ((m = new RegExp(`^/v1/empresas/([^/]+)/${rota}$`).exec(p))) { if (req.method === 'GET') return json(res, 200, await mod.listar(s, m[1])); if (req.method === 'POST') return json(res, 201, await mod.criar(s, m[1], await corpo())); }
         if ((m = new RegExp(`^/v1/${rota}/([^/]+)$`).exec(p))) { if (req.method === 'PATCH') return json(res, 200, await mod.editar(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await mod.excluir(s, m[1])); }
       }

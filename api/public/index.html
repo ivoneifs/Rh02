@@ -154,7 +154,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{msg('');
 async function iniciar(){
   try{eu=await call('GET','/auth/me')}catch{mostrarAuth();return}
   $('auth').classList.add('hide');$('app').classList.remove('hide');
-  $('quem').textContent=`${eu.nome} · ${eu.papel}`;$('tAdm').classList.toggle('hide',eu.papel!=='ADMIN');
+  $('quem').textContent=`${eu.nome} · ${eu.papel}`;$('tAdm').classList.toggle('hide',eu.papel!=='ADMIN');for(const b of ['funCargos','funAmb'])$(b).classList.toggle('hide',eu.papel!=='ADMIN');
   document.querySelector('nav button[data-t=bal]').click();
 }
 async function carregarEmpresas(){

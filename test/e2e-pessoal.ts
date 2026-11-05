@@ -41,6 +41,15 @@ r = await B.r('POST', '/auth/cadastro', { nome: 'Bia', escritorio: 'Outro ' + sf
 r = await B.r('GET', `/v1/funcionarios/${fid}`); assert.equal(r.s, 404); r = await B.r('GET', `/v1/empresas/${emp}/funcionarios`); assert.equal(r.s, 404);
 r = await B.r('GET', `/v1/registros?funcionario=${fid}`); assert.equal(r.j.length, 0);
 r = await B.r('PATCH', `/v1/registros/${aso}`, { status: 'CANCELADO' }); assert.equal(r.s, 404);
+// CONTADOR: usa Funcionários, mas não altera configuração (cargos/ambientes/normas/admin)
+r = await A.r('POST', '/v1/admin/usuarios', { nome: 'Cont', email: `c.${sfx}@t.com`, papel: 'CONTADOR', senha: SENHA }); assert.equal(r.s, 201);
+const C = new Cli(); r = await C.r('POST', '/auth/login', { email: `c.${sfx}@t.com`, senha: SENHA }); assert.equal(r.s, 200);
+r = await C.r('POST', `/v1/empresas/${emp}/funcionarios`, { codigo: 'CT1', nome: 'Func do Contador', cpf: '529.982.247-25', data_nascimento: '1990-01-01', data_admissao: '2020-01-01' }); assert.ok(r.s === 201 || r.s === 422, 'contador cria funcionário: ' + r.s);
+r = await C.r('POST', `/v1/empresas/${emp}/cargos`, { codigo: 'CX', nome: 'X' }); assert.equal(r.s, 403);
+r = await C.r('POST', `/v1/empresas/${emp}/ambientes`, { codigo: 'AX', nome: 'X' }); assert.equal(r.s, 403);
+r = await C.r('GET', `/v1/empresas/${emp}/cargos`); assert.equal(r.s, 200);
+r = await C.r('POST', '/v1/normas', { codigo: 'SM', valor: {} }); assert.equal(r.s, 403);
+r = await C.r('GET', '/v1/admin/usuarios'); assert.equal(r.s, 403);
 r = await A.r('POST', '/v1/admin/usuarios', { nome: 'Leitor', email: `l.${sfx}@t.com`, papel: 'CLIENTE_LEITURA', senha: SENHA }); assert.equal(r.s, 201);
 const L = new Cli(); r = await L.r('POST', '/auth/login', { email: `l.${sfx}@t.com`, senha: SENHA }); assert.equal(r.s, 200);
 r = await L.r('GET', `/v1/empresas/${emp}/funcionarios`); assert.equal(r.s, 200);
