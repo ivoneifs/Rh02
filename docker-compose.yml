@@ -1,0 +1,36 @@
+# Coolify: recurso "Docker Compose" (build pack) apontando para este repositório.
+# Defina as variáveis abaixo na aba Environment Variables do Coolify; domínio no serviço "api" (porta 3000).
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: erp_owner
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+      POSTGRES_DB: erp
+    volumes:
+      - erp_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp_owner -d erp"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_ADMIN_URL: postgres://erp_owner:${POSTGRES_PASSWORD}@db:5432/erp
+      DATABASE_URL: postgres://erp_app:${APP_DB_PASSWORD:?defina APP_DB_PASSWORD}@db:5432/erp
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      API_TOKEN: ${API_TOKEN:?defina API_TOKEN (min. 24 caracteres)}
+      SEED_DEMO: ${SEED_DEMO:-false}
+      PORT: "3000"
+    expose:
+      - "3000"
+volumes:
+  erp_pgdata:

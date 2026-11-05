@@ -1,0 +1,54 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ERP Contábil · Balancete</title>
+<style>
+:root{--bg:#f6f7fb;--fg:#1b2333;--mut:#667;--card:#fff;--line:#e3e6ef;--pri:#1d4ed8;--side:#0f1b3d}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1424;--fg:#e8ebf5;--mut:#9aa3bd;--card:#151d33;--line:#263253;--pri:#6b93ff;--side:#0a1020}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+header{background:var(--side);color:#fff;padding:12px 16px;font-weight:600}
+main{padding:16px;max-width:1100px;margin:auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:end;background:var(--card);border:1px solid var(--line);padding:12px;border-radius:8px}
+label{display:grid;gap:2px;font-size:12px;color:var(--mut)}input,select,button{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg)}
+button{background:var(--pri);color:#fff;border:0;cursor:pointer}button.sec{background:transparent;color:var(--pri);border:1px solid var(--pri)}
+.tw{margin-top:12px;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:8px;max-height:65vh}
+table{border-collapse:collapse;width:100%}th,td{padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{position:sticky;top:0;background:var(--card);text-align:left}
+td.n{text-align:right;font-variant-numeric:tabular-nums}tr.s td{font-weight:600}
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg);width:min(900px,95vw)}
+#msg{margin:8px 0;color:#c0392b}
+</style></head><body>
+<header>ERP Contábil · Balancete dinâmico</header>
+<main>
+<div class="bar">
+<label>Token<input id="tok" type="password" autocomplete="off" size="18"></label>
+<label>Tenant (uuid)<input id="ten" size="36"></label>
+<button class="sec" id="bEmp">Carregar empresas</button>
+<label>Empresa<select id="emp"></select></label>
+<label>De<input id="de" type="date" value="2025-01-01"></label>
+<label>Até<input id="ate" type="date" value="2025-01-31"></label>
+<button id="bCons">Consultar</button></div>
+<div id="msg"></div>
+<div class="tw"><table><thead><tr><th>Conta</th><th>Título</th><th>C.R.</th><th class="n">Saldo anterior</th><th class="n">Débito</th><th class="n">Crédito</th><th class="n">Saldo final</th><th>Razão</th></tr></thead><tbody id="tb"></tbody></table></div>
+</main>
+<dialog id="dlg"><h3 id="dt">Razão</h3><div class="tw"><table><thead><tr><th>Data</th><th>Nº</th><th>Documento</th><th>Contrapartida</th><th class="n">Débito</th><th class="n">Crédito</th><th class="n">Saldo</th></tr></thead><tbody id="rb"></tbody></table></div><p><button class="sec" id="fch">Fechar</button></p></dialog>
+<script>
+const $=i=>document.getElementById(i);
+try{$('tok').value=sessionStorage.getItem('tok')||'';$('ten').value=localStorage.getItem('ten')||''}catch{}
+const api=async p=>{const r=await fetch(p,{headers:{authorization:'Bearer '+$('tok').value,'x-tenant-id':$('ten').value}});
+ const j=await r.json();if(!r.ok)throw new Error(j.erro||('HTTP '+r.status));return j};
+const money=v=>{const n=Number(v);return n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})};
+const dc=v=>{const n=Number(v);return n===0?'0,00':money(Math.abs(n))+(n>0?' D':' C')};
+const td=(t,c)=>{const e=document.createElement('td');e.textContent=t;if(c)e.className=c;return e};
+const err=e=>{$('msg').textContent=e.message};
+$('bEmp').onclick=async()=>{try{$('msg').textContent='';try{sessionStorage.setItem('tok',$('tok').value);localStorage.setItem('ten',$('ten').value)}catch{}
+ const l=await api('/v1/empresas');$('emp').replaceChildren(...l.map(e=>Object.assign(document.createElement('option'),{value:e.id,textContent:e.razao_social})))}catch(e){err(e)}};
+$('bCons').onclick=async()=>{try{$('msg').textContent='';
+ const q=new URLSearchParams({de:$('de').value,ate:$('ate').value});
+ const rows=await api(`/v1/empresas/${$('emp').value}/balancete?`+q);
+ $('tb').replaceChildren(...rows.map(r=>{const tr=document.createElement('tr');if(r.tipo==='S')tr.className='s';
+  tr.append(td(r.codigo),td(r.titulo),td(r.cr),td(dc(r.saldo_anterior),'n'),td(money(r.total_debito),'n'),td(money(r.total_credito),'n'),td(dc(r.saldo_final),'n'));
+  const z=document.createElement('td');if(r.permite_razao){const b=document.createElement('button');b.className='sec';b.textContent='Ver';b.onclick=()=>razao(r);z.append(b)}tr.append(z);return tr}))}catch(e){err(e)}};
+async function razao(r){try{const q=new URLSearchParams({conta:r.id,de:$('de').value,ate:$('ate').value});
+ const rows=await api(`/v1/empresas/${$('emp').value}/razao?`+q);$('dt').textContent=r.codigo+' — '+r.titulo;
+ $('rb').replaceChildren(...rows.map(x=>{const tr=document.createElement('tr');tr.append(td(x.data.slice(0,10)),td(x.numero),td(x.documento||''),td(x.conta_contrapartida||''),td(x.debito?money(x.debito):'','n'),td(x.credito?money(x.credito):'','n'),td(dc(x.saldo_acumulado),'n'));return tr}));
+ $('dlg').showModal()}catch(e){err(e)}}
+$('fch').onclick=()=>$('dlg').close();
+</script></body></html>

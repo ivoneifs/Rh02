@@ -1,0 +1,4 @@
+{ "name": "erp-contabil-api", "version": "0.1.0", "private": true, "type": "module",
+  "engines": { "node": ">=22.18" },
+  "scripts": { "migrate": "node --experimental-strip-types --no-warnings api/src/migrate.ts", "start": "node --experimental-strip-types --no-warnings api/src/server.ts", "test": "node --experimental-strip-types --no-warnings --test test/smoke.test.ts test/sst.test.ts" },
+  "dependencies": { "pg": "8.13.1" } }
