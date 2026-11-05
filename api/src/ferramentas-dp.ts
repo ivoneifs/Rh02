@@ -15,6 +15,8 @@ const ETAPAS: [string, string][] = [['TRIAGEM', 'Triagem'], ['ENTREVISTA_RH', 'E
 export const FERR_DP: Ferr[] = [
   reg('SST · Documentos e gestão', 'documento_emitido', 'Documento emitido (relatórios, laudos e modelos)', 'Cópia gravada de cada documento gerado na aba Documentos, com quem emitiu, empresa e colaborador.',
     [T('modelo', 'Modelo'), T('area', 'Área'), A('texto', 'Texto do documento'), T('profissional', 'Responsável pela assinatura')], { empresa: true, func: true, data: 'Data de emissão' }),
+  reg('DP · Folha e holerite', 'holerite', 'Holerite (recibo de pagamento de salário)', 'Holerite gravado por colaborador e competência. Criado e editado na aba Holerites, com cálculo pelas tabelas vigentes.',
+    [T('competencia', 'Competência (AAAA-MM)')], { data: 'Fim da competência', func: true }),
   reg('DP · Agenda e lembretes', 'compromisso', 'Compromisso / lembrete (agenda e alarme)', 'Compromissos com data, hora e alarme: aparecem na aba Agenda e avisam antes da hora marcada.',
     [S('tipo', 'Tipo', [['reuniao', 'Reunião'], ['prazo', 'Prazo / vencimento'], ['visita', 'Visita / inspeção'], ['audiencia', 'Audiência'], ['treinamento', 'Treinamento'], ['lembrete', 'Lembrete']]), T('hora', 'Hora (HH:MM)', '09:00'),
      S('antes', 'Avisar antes', [['0', 'Na hora'], ['15', '15 minutos antes'], ['30', '30 minutos antes'], ['60', '1 hora antes'], ['1440', '1 dia antes'], ['2880', '2 dias antes']], '30'), T('local', 'Local ou link'), A('obs', 'Observações')],

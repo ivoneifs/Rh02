@@ -198,6 +198,8 @@ Alarme / lembrete|Sistema|Aviso na tela, com som (e notificação do navegador, 
 Calculadora|Sistema|Botão 🧮 no topo: calculadora com percentuais (ex.: 200+10% = 220), histórico e atalhos para % de um valor, acréscimo, desconto, valor da hora e regra de três.
 Compromisso|Sistema|Registro da agenda com título, data, hora, tipo, local e antecedência do alarme. Pode ser concluído, reaberto ou editado a qualquer momento.
 Modelos preenchidos|Sistema|Aba de consulta com todos os modelos de documentos já preenchidos com dados fictícios, para você ver como o documento fica quando bem preenchido. Não são documentos reais.
+Holerite (contracheque)|DP e RH|Recibo de pagamento de salário do colaborador, com vencimentos, descontos (INSS, IRRF, vale-transporte etc.), líquido e bases de cálculo de FGTS e IRRF. Na aba Holerites você cria, consulta, edita, exclui e imprime; o cálculo usa as tabelas vigentes do sistema e deve ser conferido com a folha oficial.
+Competência|DP e RH|Mês de referência de um pagamento ou obrigação (ex.: 11/2026 = novembro de 2026), independentemente da data em que é pago.
 Completar com IA|Sistema|Botão em cada ferramenta: você preenche uma parte e a IA, como superusuário, completa o restante de acordo com o que você informou (destacado em roxo), sem sobrescrever seus dados e listando o que conferir. Se nada for preenchido, gera um exemplo fictício para aprender. Nada é gravado até você salvar.
 Explicar o cálculo|Sistema|Botão que a IA usa para descrever, passo a passo, como o resultado foi obtido.
 Documentos|Sistema|Aba com mais de 200 modelos de laudos, relatórios, contratos, declarações e comunicados, preenchidos com dados da empresa e do colaborador, com impressão em PDF.

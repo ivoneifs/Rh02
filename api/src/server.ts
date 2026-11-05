@@ -21,6 +21,7 @@ import { TERMOS } from './glossario.ts';
 import * as anexos from './anexos.ts';
 import { controle as controleSst } from './controle.ts';
 import { exemploDoModelo } from './exemplos.ts';
+import { calcular as calcularHolerite } from './holerite.ts';
 import { catalogo as modelos, redigir as redigirModelo, AVISO as AVISO_DOC } from './modelos-catalogo.ts';
 import * as dadosTeste from './dadostestes.ts';
 import { semaforo } from './semaforo.ts';
@@ -78,7 +79,7 @@ const server = http.createServer(async (req, res) => {
 
     let m: RegExpExecArray | null;
     // Ferramentas de cálculo (qualquer papel logado) e Normas (leitura: todos; alteração: ADMIN)
-    if (p.startsWith('/v1/ferramentas') || p.startsWith('/v1/modelos') || p.startsWith('/v1/anexos') || p === '/v1/glossario' || p === '/v1/semaforo' || p === '/v1/sugestao/condicoes' || /^\/v1\/registros\/[^/]+\/analisar$/.test(p) || p.startsWith('/v1/normas') || p.startsWith('/v1/registros') || p.startsWith('/v1/funcionarios') || p.startsWith('/v1/cargos') || p.startsWith('/v1/ambientes') || /^\/v1\/empresas\/[^/]+\/(funcionarios|cargos|ambientes)$/.test(p)) {
+    if (p.startsWith('/v1/ferramentas') || p.startsWith('/v1/modelos') || p.startsWith('/v1/holerite') || p.startsWith('/v1/anexos') || p === '/v1/glossario' || p === '/v1/semaforo' || p === '/v1/sugestao/condicoes' || /^\/v1\/registros\/[^/]+\/analisar$/.test(p) || p.startsWith('/v1/normas') || p.startsWith('/v1/registros') || p.startsWith('/v1/funcionarios') || p.startsWith('/v1/cargos') || p.startsWith('/v1/ambientes') || /^\/v1\/empresas\/[^/]+\/(funcionarios|cargos|ambientes)$/.test(p)) {
       const s = await auth.sessaoDe(req); if (!s) return json(res, 401, { erro: 'não autenticado' });
       const corpo = async () => JSON.parse(await lerCorpo(req, 200_000));
       const qp = url.searchParams;
@@ -103,6 +104,7 @@ const server = http.createServer(async (req, res) => {
         if (req.method === 'DELETE') return json(res, 200, await anexos.excluir(s, m[1]));
       }
       if (p === '/v1/glossario' && req.method === 'GET') return json(res, 200, TERMOS);
+      if (p === '/v1/holerite/calcular' && req.method === 'POST') return json(res, 200, await calcularHolerite(s, await corpo(), await normas.vigentes(s)));
       if (p === '/v1/modelos/exemplos' && req.method === 'GET') { EXEMPLOS ??= Object.fromEntries(modelos().map(x => [x.id, exemploDoModelo(x)])); return json(res, 200, { itens: EXEMPLOS }); }
       if (p === '/v1/modelos' && req.method === 'GET') return json(res, 200, { aviso: AVISO_DOC, modelos: modelos() });
       if ((m = /^\/v1\/modelos\/([a-z0-9-]+)\/redigir$/.exec(p)) && req.method === 'POST') { const md = modelos().find(x => x.id === m![1]); if (!md) return json(res, 404, { erro: 'modelo desconhecido' }); return json(res, 200, await redigirModelo(s, md, await corpo())); }
