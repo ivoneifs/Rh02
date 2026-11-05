@@ -38,14 +38,20 @@ export async function gerar(s: Sessao) {
     for (let j = 0; j < 12; j++) {
       seq++; const k = (i + j) % CARGOS.length, nasc = 1965 + (seq * 7) % 38, adm = 2015 + (seq % 11);
       const f = await pessoal.criarFuncionario(s, emp.id, {
-        matricula: String(1000 + seq), nome: `${NOMES[(seq * 3) % NOMES.length]} ${SOBR[seq % SOBR.length]} ${SOBR[(seq * 5 + 2) % SOBR.length]}`, cpf: cpfGerado(seq), pis_nis: pisGerado(seq),
+        matricula: String(1000 + seq), nome: `${NOMES[(seq * 3) % NOMES.length]} ${SOBR[seq % SOBR.length]} ${SOBR[(seq * 5 + 2) % SOBR.length]}`, cpf: cpfGerado(seq), pis_nis: seq % 11 === 0 ? undefined : pisGerado(seq),
         data_nascimento: `${nasc}-${String(1 + seq % 12).padStart(2, '0')}-${String(1 + (seq * 3) % 28).padStart(2, '0')}`, sexo: seq % 3 ? 'M' : 'F', estado_civil: ['SOLTEIRO', 'CASADO', 'UNIAO_ESTAVEL'][seq % 3], escolaridade: ['MEDIO', 'TECNICO', 'SUPERIOR'][seq % 3],
         telefone: `(11) 9${String(10000000 + seq * 12345).slice(0, 4)}-${String(1000 + seq * 7).slice(0, 4)}`, email: `teste${seq}@exemplo.invalid`, cidade: 'Cidade Exemplo', uf, cep: '01001000',
-        data_admissao: `${adm}-${String(1 + (seq * 5) % 12).padStart(2, '0')}-10`, cargo_id: cargos[k], ambiente_id: amb[k === 2 || k === 5 ? 1 : 0], funcao: CARGOS[k][0], setor: CARGOS[k][2], cbo: CARGOS[k][1],
-        salario: 1800 + (seq % 9) * 350, jornada_semanal: 44, tipo_contrato: undefined, dependentes: seq % 4, pcd: seq % 17 === 0, observacoes: 'Dados fictícios para teste — pode excluir.' });
+        data_admissao: seq % 9 === 0 ? somaDias(-80) : `${adm}-${String(1 + (seq * 5) % 12).padStart(2, '0')}-10`, cargo_id: cargos[k], ambiente_id: amb[k === 2 || k === 5 ? 1 : 0], funcao: CARGOS[k][0], setor: CARGOS[k][2], cbo: CARGOS[k][1],
+        salario: 1800 + (seq % 9) * 350, jornada_semanal: 44, tipo_contrato: seq % 9 === 0 ? 'EXPERIENCIA' : 'CLT_INDETERMINADO', ctps: seq % 7 === 0 ? undefined : `CTPS ${100000 + seq}`, dependentes: seq % 4, pcd: seq % 17 === 0, observacoes: 'Dados fictícios para teste — pode excluir.' });
       nf++;
-      if (j < 4) { // ASO com validades variadas (vencido / a vencer / em dia) para testar o painel de vencimentos
-        const desl = [-20, 12, 90, 300][(seq + j) % 4]; await registros.criar(s, { ferramenta: 'aso', empresa_id: emp.id, funcionario_id: f.id, titulo: 'ASO periódico (teste)', data_evento: somaDias(desl - 365), data_validade: somaDias(desl), status: 'ABERTO', dados: { tipo: 'PERIODICO', resultado: 'APTO' } }); nr++; }
+      // ASO para todos, com validades variadas (vencido / a vencer / em dia) e controle de férias, para exercitar o semáforo
+      const desl = [-20, 12, 90, 300][seq % 4]; await registros.criar(s, { ferramenta: 'aso', empresa_id: emp.id, funcionario_id: f.id, titulo: 'ASO periódico (teste)', data_evento: somaDias(desl - 365), data_validade: somaDias(desl), status: 'ABERTO', dados: { tipo: 'PERIODICO', resultado: 'APTO' } }); nr++;
+      if (seq % 5 !== 0) { const meses = [3, 8, 14, 20, 26][seq % 5]; await registros.criar(s, { ferramenta: 'ferias_dp', empresa_id: emp.id, funcionario_id: f.id, titulo: 'Férias (teste)', data_evento: somaDias(-Math.round(meses * 30.4)), data_validade: somaDias(-Math.round(meses * 30.4) + 29), status: 'CONCLUIDO', dados: { dias: 30 } }); nr++; }
+    }
+    if (i === 0) { // vaga e candidatos fictícios para testar a análise por IA no processo seletivo
+      await registros.criar(s, { ferramenta: 'vaga', empresa_id: emp.id, titulo: 'Soldador (teste)', data_evento: somaDias(-5), data_validade: somaDias(25), status: 'ABERTO', dados: { cargo: 'Soldador', quantidade: 2, salario_min: 2800, salario_max: 3600, requisitos: 'Ensino médio; 2 anos de experiência com solda MIG/MAG; leitura de desenho técnico', nrs: 'NR-18, NR-34, NR-35', riscos: 'Fumos metálicos, ruído, radiação não ionizante, trabalho em altura', exames: 'Audiometria, espirometria, avaliação clínica' } }); nr++;
+      const cs = [['Candidato Exemplo 1', 'TECNICO', 5, 'Soldador MIG/MAG em metalúrgica por 5 anos; leitura de desenho técnico.', 'NR-35 (válida), NR-10', 3200], ['Candidato Exemplo 2', 'MEDIO', 1, 'Auxiliar de produção; começou a aprender solda.', 'Nenhum curso de NR', 2500], ['Candidato Exemplo 3', 'MEDIO', 3, 'Soldador eletrodo revestido em obras.', 'NR-18, NR-35 vencida', 3000]] as const;
+      for (const [k, c] of cs.entries()) { await registros.criar(s, { ferramenta: 'candidato', empresa_id: emp.id, titulo: c[0] + ' – Soldador', data_evento: somaDias(-k - 1), status: 'ABERTO', dados: { vaga: 'Soldador (teste)', etapa: 'TRIAGEM', formacao: c[1], exp_anos: c[2], experiencia: c[3], cursos: c[4], pretensao: c[5] } }); nr++; }
     }
   }
   return { empresas: EMPRESAS.length, funcionarios: nf, registros: nr };

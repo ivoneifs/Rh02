@@ -1,7 +1,8 @@
 import { FERRAMENTAS, ErroCalc, type Ferr } from './ferramentas.ts';
 import { FERR_SST } from './ferramentas-sst.ts';
 import { FERR_EXTRA } from './ferramentas-extra.ts';
-export const TODAS: Ferr[] = [...FERRAMENTAS.map(f => ({ ...f, tipo: 'calc' as const })), ...FERR_SST, ...FERR_EXTRA];
+import { FERR_DP } from './ferramentas-dp.ts';
+export const TODAS: Ferr[] = [...FERRAMENTAS.map(f => ({ ...f, tipo: 'calc' as const })), ...FERR_SST, ...FERR_EXTRA, ...FERR_DP];
 export const catalogo = () => TODAS.map(({ calc, ...c }) => c);
 export function executar(id: string, entrada: any, P: any) {
   const f = TODAS.find(x => x.id === id); if (!f) throw new ErroCalc('Ferramenta desconhecida.');
