@@ -10,6 +10,9 @@ import { sugerir, ClassificadorHistorico, type Regra } from '../../src/conciliac
 import { SQL_BALANCETE, SQL_RAZAO } from './sql.ts';
 import { lerConfig, salvarConfig, removerChave, conversar } from './ia-rotas.ts';
 import { ErroLLM } from './agente.ts';
+import * as auth from './auth.ts';
+import * as normas from './normas.ts';
+import { catalogo, executar, ErroCalc } from './ferramentas.ts';
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const TOKEN = process.env.API_TOKEN ?? '';
@@ -36,12 +39,70 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://x'); const p = url.pathname;
     if (p === '/' || p === '/index.html') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'x-frame-options': 'DENY', 'content-security-policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'" }); return res.end(INDEX); }
     if (p === '/health') { await pool.query('SELECT 1'); return json(res, 200, { ok: true }); }
+    const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '').split(',').pop()!.trim();
+    const mutante = req.method !== 'GET' && req.method !== 'HEAD';
+    const setCookie = (token: string, apagar = false) => res.setHeader('set-cookie', auth.cookieSessao(req, token, apagar));
+    // Defesa extra de CSRF além do SameSite=Strict: requisições que alteram dados exigem JSON.
+    if (mutante && (p.startsWith('/auth/') || p.startsWith('/v1/')) && !/^application\/json/i.test(String(req.headers['content-type'] ?? '')) && !req.headers.authorization && !/\/conciliacao\/ofx$/.test(p) && req.method !== 'DELETE')
+      return json(res, 415, { erro: 'content-type deve ser application/json' });
+
+    if (p === '/auth/cadastro' && req.method === 'POST') {
+      if (process.env.PERMITIR_CADASTRO === 'false') return json(res, 403, { erro: 'Cadastro público desativado. Peça um convite ao administrador.' });
+      const { token } = await auth.cadastrar(JSON.parse(await lerCorpo(req, 20_000))); setCookie(token); return json(res, 201, { ok: true });
+    }
+    if (p === '/auth/login' && req.method === 'POST') { const { token } = await auth.entrar(JSON.parse(await lerCorpo(req, 20_000)), ip); setCookie(token); return json(res, 200, { ok: true }); }
+    if (p === '/auth/logout' && req.method === 'POST') { await auth.sair(req); setCookie('', true); return json(res, 200, { ok: true }); }
+    if (p === '/auth/config' && req.method === 'GET') return json(res, 200, { cadastroAberto: process.env.PERMITIR_CADASTRO !== 'false' });
+    if (p === '/auth/me' && req.method === 'GET') { const s = await auth.sessaoDe(req); return s ? json(res, 200, { nome: s.nome, email: s.email, papel: s.papel }) : json(res, 401, { erro: 'não autenticado' }); }
+    if (p === '/auth/senha' && req.method === 'POST') {
+      const s = await auth.sessaoDe(req); if (!s) return json(res, 401, { erro: 'não autenticado' });
+      await auth.trocarSenha(s, JSON.parse(await lerCorpo(req, 20_000)), req); return json(res, 200, { ok: true });
+    }
+
     if (!p.startsWith('/v1/')) return json(res, 404, { erro: 'não encontrado' });
-    if (!autorizado(req)) return json(res, 401, { erro: 'token inválido' });
-    const tenant = String(req.headers['x-tenant-id'] ?? '');
-    if (!isUuid(tenant)) return json(res, 400, { erro: 'X-Tenant-Id (uuid) obrigatório' });
-    const db = dbDoTenant(tenant);
+
     let m: RegExpExecArray | null;
+    // Ferramentas de cálculo (qualquer papel logado) e Normas (leitura: todos; alteração: ADMIN)
+    if (p.startsWith('/v1/ferramentas') || p.startsWith('/v1/normas')) {
+      const s = await auth.sessaoDe(req); if (!s) return json(res, 401, { erro: 'não autenticado' });
+      const corpo = async () => JSON.parse(await lerCorpo(req, 200_000));
+      if (p === '/v1/ferramentas' && req.method === 'GET') return json(res, 200, catalogo());
+      if ((m = /^\/v1\/ferramentas\/([a-z0-9_]+)$/i.exec(p)) && req.method === 'POST') return json(res, 200, executar(m[1], await corpo(), await normas.vigentes(s)));
+      if (p === '/v1/normas/categorias' && req.method === 'GET') return json(res, 200, Object.entries(normas.CATEGORIAS).map(([id, c]) => ({ id, ...c })));
+      if (p === '/v1/normas' && req.method === 'GET') return json(res, 200, await normas.listar(s, url.searchParams.get('categoria') ?? undefined));
+      if (p === '/v1/normas' && req.method === 'POST') return json(res, 201, await normas.criar(s, await corpo()));
+      if (p === '/v1/normas/historico' && req.method === 'GET') return json(res, 200, await normas.historico(s, url.searchParams.get('codigo') ?? undefined));
+      if (p === '/v1/normas/restaurar' && req.method === 'POST') return json(res, 200, await normas.restaurarPadroes(s));
+      if ((m = /^\/v1\/normas\/atualizar\/([A-Z_]+)$/.exec(p)) && req.method === 'POST') return json(res, 200, await normas.atualizar(s, m[1]));
+      if ((m = /^\/v1\/normas\/([^/]+)\/aprovar$/.exec(p)) && req.method === 'POST') return json(res, 200, await normas.aprovar(s, m[1]));
+      if ((m = /^\/v1\/normas\/([^/]+)$/.exec(p))) { if (req.method === 'PATCH') return json(res, 200, await normas.editar(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await normas.excluir(s, m[1])); }
+      return json(res, 404, { erro: 'rota não encontrada' });
+    }
+
+    // Administração (somente sessão de usuário ADMIN)
+    if (p.startsWith('/v1/admin/')) {
+      const s = await auth.sessaoDe(req); if (!s) return json(res, 401, { erro: 'não autenticado' });
+      const corpo = async () => JSON.parse(await lerCorpo(req, 20_000));
+      if (p === '/v1/admin/usuarios') { if (req.method === 'GET') return json(res, 200, await auth.listarUsuarios(s)); if (req.method === 'POST') return json(res, 201, await auth.criarUsuario(s, await corpo())); }
+      if ((m = /^\/v1\/admin\/usuarios\/([^/]+)$/.exec(p))) { if (req.method === 'PATCH') return json(res, 200, await auth.editarUsuario(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await auth.excluirUsuario(s, m[1])); }
+      if (p === '/v1/admin/empresas') { if (req.method === 'GET') return json(res, 200, await auth.listarEmpresasAdmin(s)); if (req.method === 'POST') return json(res, 201, await auth.criarEmpresa(s, await corpo())); }
+      if ((m = /^\/v1\/admin\/empresas\/([^/]+)$/.exec(p))) { if (req.method === 'PATCH') return json(res, 200, await auth.editarEmpresa(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await auth.excluirEmpresa(s, m[1])); }
+      return json(res, 404, { erro: 'rota não encontrada' });
+    }
+
+    // Dados: token de integração (Bearer + X-Tenant-Id) OU sessão de usuário (tenant e papel vêm da sessão)
+    let tenant: string, papel: string = 'ADMIN', usuarioSessao: string | null = null;
+    if (req.headers.authorization) {
+      if (!autorizado(req)) return json(res, 401, { erro: 'token inválido' });
+      tenant = String(req.headers['x-tenant-id'] ?? '');
+      if (!isUuid(tenant)) return json(res, 400, { erro: 'X-Tenant-Id (uuid) obrigatório' });
+    } else {
+      const s = await auth.sessaoDe(req); if (!s) return json(res, 401, { erro: 'não autenticado' });
+      if (mutante && s.papel === 'CLIENTE_LEITURA') return json(res, 403, { erro: 'Perfil somente leitura.' });
+      if (p === '/v1/ia/config' && mutante && s.papel !== 'ADMIN') return json(res, 403, { erro: 'Apenas administradores configuram a IA.' });
+      tenant = s.tenantId; papel = s.papel; usuarioSessao = s.usuarioId;
+    }
+    const db = dbDoTenant(tenant, papel);
 
     if (p === '/v1/ia/config') {
       if (req.method === 'GET') return json(res, 200, await lerConfig(db));
@@ -58,7 +119,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && p === '/v1/lancamentos') {
       const b = JSON.parse(await lerCorpo(req));
       if (!isUuid(b.empresaId)) return json(res, 400, { erro: 'empresaId inválido' });
-      return json(res, 201, await criarLancamento(db, tenant, isUuid(b.usuarioId) ? b.usuarioId : null as any, b));
+      return json(res, 201, await criarLancamento(db, tenant, usuarioSessao ?? (isUuid(b.usuarioId) ? b.usuarioId : null as any), b));
     }
 
     if (req.method === 'GET' && (m = /^\/v1\/empresas\/([^/]+)\/balancete$/.exec(p))) {
@@ -95,6 +156,8 @@ const server = http.createServer(async (req, res) => {
     }
     return json(res, 404, { erro: 'rota não encontrada' });
   } catch (e: any) {
+    if (e instanceof ErroCalc) return json(res, 422, { erro: e.message });
+    if (e instanceof auth.ErroAuth) return json(res, e.status, { erro: e.message });
     if (e instanceof ErroDeNegocio) return json(res, 422, { codigo: e.codigo, detalhes: e.detalhes });
     if (e instanceof ErroLLM) return json(res, e.status === 401 ? 502 : e.status >= 500 ? 502 : e.status, { erro: e.status === 401 ? 'A OpenAI rejeitou a chave. Cadastre uma chave válida.' : e.message });
     if (e instanceof RangeError) return json(res, 400, { erro: e.message });

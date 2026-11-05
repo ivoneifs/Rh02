@@ -1,76 +1,247 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ERP Contábil · Balancete</title>
+<title>ERP Contábil</title>
 <style>
-:root{--bg:#f6f7fb;--fg:#1b2333;--mut:#667;--card:#fff;--line:#e3e6ef;--pri:#1d4ed8;--side:#0f1b3d}
-@media(prefers-color-scheme:dark){:root{--bg:#0e1424;--fg:#e8ebf5;--mut:#9aa3bd;--card:#151d33;--line:#263253;--pri:#6b93ff;--side:#0a1020}}
+:root{--bg:#f6f7fb;--fg:#1b2333;--mut:#667;--card:#fff;--line:#e3e6ef;--pri:#1d4ed8;--side:#0f1b3d;--err:#c0392b;--ok:#1a7f4b}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1424;--fg:#e8ebf5;--mut:#9aa3bd;--card:#151d33;--line:#263253;--pri:#6b93ff;--side:#0a1020;--err:#ff7b6b;--ok:#4cc38a}}
 *{box-sizing:border-box}body{margin:0;font:14px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
-header{background:var(--side);color:#fff;padding:12px 16px;font-weight:600}
+header{background:var(--side);color:#fff;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header b{font-size:15px}header .sp{flex:1}header span{opacity:.8;font-size:12px}
+nav{display:flex;gap:4px}nav button{background:transparent;color:#cfd6ee;border:0;padding:6px 12px;border-radius:6px;cursor:pointer}nav button.on{background:rgba(255,255,255,.15);color:#fff}
 main{padding:16px;max-width:1100px;margin:auto}
-.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:end;background:var(--card);border:1px solid var(--line);padding:12px;border-radius:8px}
+.bar,.card{background:var(--card);border:1px solid var(--line);padding:12px;border-radius:8px;margin-bottom:12px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
 label{display:grid;gap:2px;font-size:12px;color:var(--mut)}input,select,button{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg)}
-button{background:var(--pri);color:#fff;border:0;cursor:pointer}button.sec{background:transparent;color:var(--pri);border:1px solid var(--pri)}
-.tw{margin-top:12px;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:8px;max-height:65vh}
+button{background:var(--pri);color:#fff;border:0;cursor:pointer}button.sec{background:transparent;color:var(--pri);border:1px solid var(--pri)}button.dng{background:transparent;color:var(--err);border:1px solid var(--err)}
+button.sm{padding:3px 8px;font-size:12px}
+.tw{overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:8px;max-height:65vh}
 table{border-collapse:collapse;width:100%}th,td{padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{position:sticky;top:0;background:var(--card);text-align:left}
-td.n{text-align:right;font-variant-numeric:tabular-nums}tr.s td{font-weight:600}
+td.n{text-align:right;font-variant-numeric:tabular-nums}tr.s td{font-weight:600}tr.off td{opacity:.55}
 dialog{border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg);width:min(900px,95vw)}
-#msg{margin:8px 0;color:#c0392b}
+dialog.pq{width:min(420px,95vw)}
+.msg{margin:8px 0;min-height:18px;color:var(--err)}.msg.ok{color:var(--ok)}
+#auth{max-width:380px;margin:8vh auto;padding:0 16px}#auth .card{display:grid;gap:10px;padding:20px}#auth h1{margin:0 0 4px;font-size:20px}
+.tabs{display:flex;gap:6px;margin-bottom:12px}.hide{display:none!important}.mut{color:var(--mut)}a.lnk{color:var(--pri);cursor:pointer;text-decoration:underline}
 </style></head><body>
-<header>ERP Contábil · Balancete dinâmico</header>
+
+<!-- ============ Login / Cadastro ============ -->
+<div id="auth" class="hide">
+  <div class="card"><h1>ERP Contábil</h1>
+    <div id="fLogin" style="display:grid;gap:10px">
+      <label>E-mail<input id="lEmail" type="email" autocomplete="username"></label>
+      <label>Senha<input id="lSenha" type="password" autocomplete="current-password"></label>
+      <button id="bLogin">Entrar</button>
+      <p class="mut" id="irCad" style="margin:0">Ainda não tem conta? <a class="lnk" id="aCad">Criar conta</a></p>
+    </div>
+    <div id="fCad" class="hide" style="display:grid;gap:10px">
+      <label>Seu nome<input id="cNome" autocomplete="name"></label>
+      <label>Escritório / empresa<input id="cEsc" placeholder="opcional"></label>
+      <label>E-mail<input id="cEmail" type="email" autocomplete="username"></label>
+      <label>Senha (mín. 10, com letras e números)<input id="cSenha" type="password" autocomplete="new-password"></label>
+      <button id="bCad">Criar conta</button>
+      <p class="mut" style="margin:0">Já tem conta? <a class="lnk" id="aLog">Entrar</a></p>
+    </div>
+    <div class="msg" id="aMsg"></div>
+  </div>
+</div>
+
+<!-- ============ Aplicação ============ -->
+<div id="app" class="hide">
+<header><b>ERP Contábil</b>
+  <nav><button data-t="bal" class="on">Balancete</button><button data-t="fer">Ferramentas</button><button data-t="ia">Agente de IA</button><button data-t="adm" id="tAdm" class="hide">Administração</button></nav>
+  <div class="sp"></div><span id="quem"></span><button class="sec sm" id="bSenha" style="color:#fff;border-color:#fff">Alterar senha</button><button class="sec sm" id="bSair" style="color:#fff;border-color:#fff">Sair</button></header>
 <main>
+<div class="msg" id="msg"></div>
+
+<section id="p-bal">
 <div class="bar">
-<label>Token<input id="tok" type="password" autocomplete="off" size="18"></label>
-<label>Tenant (uuid)<input id="ten" size="36"></label>
-<button class="sec" id="bEmp">Carregar empresas</button>
 <label>Empresa<select id="emp"></select></label>
 <label>De<input id="de" type="date" value="2025-01-01"></label>
 <label>Até<input id="ate" type="date" value="2025-01-31"></label>
 <button id="bCons">Consultar</button></div>
-<div id="msg"></div>
 <div class="tw"><table><thead><tr><th>Conta</th><th>Título</th><th>C.R.</th><th class="n">Saldo anterior</th><th class="n">Débito</th><th class="n">Crédito</th><th class="n">Saldo final</th><th>Razão</th></tr></thead><tbody id="tb"></tbody></table></div>
-<section class="bar" style="margin-top:16px;display:block" id="ia">
-<h3 style="margin:0 0 8px">Agente de IA</h3>
-<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:end">
+<p class="mut" id="semEmp"></p>
+</section>
+
+<section id="p-ia" class="hide">
+<div class="card"><h3 style="margin:0 0 8px">Agente de IA</h3>
+<div class="bar" style="border:0;padding:0" id="iaCfg">
 <label>Chave da OpenAI<input id="ikey" type="password" autocomplete="off" placeholder="sk-..." size="30"></label>
 <label>Modelo<input id="imod" size="16" value="gpt-4o-mini"></label>
 <label>Limite de tokens/mês<input id="ilim" type="number" min="0" value="200000" style="width:120px"></label>
 <button id="iSalvar">Salvar</button><button class="sec" id="iRemover">Remover chave</button></div>
-<p id="iStatus" style="color:var(--mut);margin:8px 0"></p>
+<p id="iStatus" class="mut" style="margin:8px 0"></p>
 <div id="chat" class="tw" style="padding:10px;max-height:280px"></div>
-<div style="display:flex;gap:8px;margin-top:8px"><input id="ipg" style="flex:1" placeholder="Pergunte: ex.: resuma o balancete de janeiro de 2025"><button id="iEnv">Enviar</button></div>
+<div style="display:flex;gap:8px;margin-top:8px"><input id="ipg" style="flex:1" placeholder="Pergunte: ex.: resuma o balancete de janeiro de 2025"><button id="iEnv">Enviar</button></div></div>
 </section>
-</main>
+
+<section id="p-fer" class="hide">
+<div class="bar"><label>Buscar<input id="fBusca" placeholder="ex.: rescisão, INSS, DAS..." size="26"></label><label>Grupo<select id="fCat"></select></label><span class="mut" id="fQtd"></span></div>
+<div id="fLista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px"></div>
+</section>
+
+<section id="p-adm" class="hide">
+<div class="tabs"><button class="sec sm" data-a="usu">Usuários</button><button class="sec sm" data-a="emp">Empresas</button><button class="sec sm" data-a="norm">Normas e tabelas</button></div>
+<div id="a-usu"><div class="bar"><button id="nUsu">+ Novo usuário</button></div>
+<div class="tw"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Situação</th><th>Último acesso</th><th>Ações</th></tr></thead><tbody id="tUsu"></tbody></table></div></div>
+<div id="a-emp" class="hide"><div class="bar"><button id="nEmp">+ Nova empresa</button></div>
+<div class="tw"><table><thead><tr><th>CNPJ</th><th>Razão social</th><th>UF</th><th>Regime</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="tEmp"></tbody></table></div></div>
+<div id="a-norm" class="hide">
+<div class="bar"><label>Categoria<select id="nCat"></select></label><button id="nNova">+ Nova norma</button><button class="sec" id="nHist">Histórico</button><button class="sec" id="nRest">Restaurar padrões</button></div>
+<div class="bar" id="nBotoes" style="flex-wrap:wrap"></div>
+<p class="mut" id="nInfo" style="margin:4px 0"></p>
+<div class="tw"><table><thead><tr><th>Código</th><th>Descrição</th><th>Vigência</th><th>Status</th><th>Valor (JSON)</th><th>Ações</th></tr></thead><tbody id="tNorm"></tbody></table></div></div>
+</section>
+</main></div>
+<dialog id="fdlg" class="pq" style="max-width:640px"><div id="fdC" style="display:grid;gap:10px"></div><p><button class="sec" id="fdX">Fechar</button></p></dialog>
+
 <dialog id="dlg"><h3 id="dt">Razão</h3><div class="tw"><table><thead><tr><th>Data</th><th>Nº</th><th>Documento</th><th>Contrapartida</th><th class="n">Débito</th><th class="n">Crédito</th><th class="n">Saldo</th></tr></thead><tbody id="rb"></tbody></table></div><p><button class="sec" id="fch">Fechar</button></p></dialog>
+<dialog id="frm" class="pq"><form method="dialog" id="frmF" style="display:grid;gap:10px"><h3 id="frmT" style="margin:0"></h3><div id="frmC" style="display:grid;gap:10px"></div><div class="msg" id="frmM"></div>
+<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="sec" id="frmX">Cancelar</button><button type="submit" id="frmOk">Salvar</button></div></form></dialog>
+
 <script>
 const $=i=>document.getElementById(i);
-try{$('tok').value=sessionStorage.getItem('tok')||'';$('ten').value=localStorage.getItem('ten')||''}catch{}
-const api=async p=>{const r=await fetch(p,{headers:{authorization:'Bearer '+$('tok').value,'x-tenant-id':$('ten').value}});
- const j=await r.json();if(!r.ok)throw new Error(j.erro||('HTTP '+r.status));return j};
-const money=v=>{const n=Number(v);return n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})};
+const el=(t,p,...f)=>{const e=Object.assign(document.createElement(t),p||{});e.append(...f);return e};
+const call=async(m,p,b)=>{const r=await fetch(p,{method:m,headers:b?{'content-type':'application/json'}:{},body:b?JSON.stringify(b):undefined});
+  const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.erro||j.detalhes?.join?.(' | ')||('HTTP '+r.status));e.status=r.status;throw e}return j};
+const money=v=>Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const dc=v=>{const n=Number(v);return n===0?'0,00':money(Math.abs(n))+(n>0?' D':' C')};
-const td=(t,c)=>{const e=document.createElement('td');e.textContent=t;if(c)e.className=c;return e};
-const err=e=>{$('msg').textContent=e.message};
-$('bEmp').onclick=async()=>{try{$('msg').textContent='';try{sessionStorage.setItem('tok',$('tok').value);localStorage.setItem('ten',$('ten').value)}catch{}
- const l=await api('/v1/empresas');$('emp').replaceChildren(...l.map(e=>Object.assign(document.createElement('option'),{value:e.id,textContent:e.razao_social})))}catch(e){err(e)}};
-$('bCons').onclick=async()=>{try{$('msg').textContent='';
+const td=(t,c)=>el('td',{textContent:t,className:c||''});
+const msg=(t,ok)=>{$('msg').textContent=t||'';$('msg').className='msg'+(ok?' ok':'')};
+const err=e=>{if(e.status===401){mostrarAuth();return}msg(e.message)};
+const fmtCnpj=c=>c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5');
+let eu=null;
+
+/* ---------- login / cadastro ---------- */
+const am=(t)=>{$('aMsg').textContent=t||''};
+function mostrarAuth(){eu=null;$('app').classList.add('hide');$('auth').classList.remove('hide');$('lSenha').value='';}
+$('aCad').onclick=()=>{$('fLogin').classList.add('hide');$('fCad').classList.remove('hide');am()};
+$('aLog').onclick=()=>{$('fCad').classList.add('hide');$('fLogin').classList.remove('hide');am()};
+$('bLogin').onclick=async()=>{try{am();await call('POST','/auth/login',{email:$('lEmail').value,senha:$('lSenha').value});await iniciar()}catch(e){am(e.message)}};
+$('lSenha').onkeydown=e=>{if(e.key==='Enter')$('bLogin').click()};
+$('bCad').onclick=async()=>{try{am();await call('POST','/auth/cadastro',{nome:$('cNome').value,escritorio:$('cEsc').value,email:$('cEmail').value,senha:$('cSenha').value});await iniciar()}catch(e){am(e.message)}};
+$('bSair').onclick=async()=>{try{await call('POST','/auth/logout',{})}catch{}mostrarAuth()};
+
+/* ---------- formulário genérico em diálogo ---------- */
+function formulario(titulo,campos,aoSalvar){
+  $('frmT').textContent=titulo;$('frmM').textContent='';
+  $('frmC').replaceChildren(...campos.map(c=>{let i;
+    if(c.opcoes){i=el('select',{id:'f_'+c.n},...c.opcoes.map(([v,t])=>el('option',{value:v,textContent:t})))}
+    else if(c.area){i=el('textarea',{id:'f_'+c.n,rows:c.area,spellcheck:false});i.style.fontFamily='monospace'}
+    else i=el('input',{id:'f_'+c.n,type:c.tipo||'text',autocomplete:c.tipo==='password'?'new-password':'off'});
+    i.value=c.v??'';if(c.maxlength)i.maxLength=c.maxlength;return el('label',{},c.l,i)}));
+  $('frmF').onsubmit=async ev=>{ev.preventDefault();try{const d={};for(const c of campos)d[c.n]=$('f_'+c.n).value;await aoSalvar(d);$('frm').close()}catch(e){$('frmM').textContent=e.message}};
+  $('frmX').onclick=()=>$('frm').close();$('frm').showModal();
+}
+$('bSenha').onclick=()=>formulario('Alterar senha',[{n:'senhaAtual',l:'Senha atual',tipo:'password'},{n:'novaSenha',l:'Nova senha (mín. 10, letras e números)',tipo:'password'}],
+  async d=>{await call('POST','/auth/senha',d);msg('Senha alterada.',true)});
+
+/* ---------- navegação ---------- */
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{msg('');
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  for(const t of ['bal','fer','ia','adm'])$('p-'+t).classList.toggle('hide',t!==b.dataset.t);
+  if(b.dataset.t==='bal')carregarEmpresas();if(b.dataset.t==='ia')carregarIA();if(b.dataset.t==='fer')carregarFerr();if(b.dataset.t==='adm')abaAdm('usu')});
+
+async function iniciar(){
+  try{eu=await call('GET','/auth/me')}catch{mostrarAuth();return}
+  $('auth').classList.add('hide');$('app').classList.remove('hide');
+  $('quem').textContent=`${eu.nome} · ${eu.papel}`;$('tAdm').classList.toggle('hide',eu.papel!=='ADMIN');
+  document.querySelector('nav button[data-t=bal]').click();
+}
+async function carregarEmpresas(){
+  try{const l=await call('GET','/v1/empresas');const sel=$('emp').value;$('emp').replaceChildren(...l.map(e=>el('option',{value:e.id,textContent:e.razao_social})));if(sel)$('emp').value=sel;
+    $('semEmp').textContent=l.length?'':(eu.papel==='ADMIN'?'Nenhuma empresa cadastrada. Cadastre em Administração › Empresas.':'Nenhuma empresa cadastrada. Peça ao administrador.')}catch(e){err(e)}
+}
+
+/* ---------- balancete ---------- */
+$('bCons').onclick=async()=>{try{msg('');if(!$('emp').value)return msg('Selecione uma empresa.');
  const q=new URLSearchParams({de:$('de').value,ate:$('ate').value});
- const rows=await api(`/v1/empresas/${$('emp').value}/balancete?`+q);
- $('tb').replaceChildren(...rows.map(r=>{const tr=document.createElement('tr');if(r.tipo==='S')tr.className='s';
+ const rows=await call('GET',`/v1/empresas/${$('emp').value}/balancete?`+q);
+ $('tb').replaceChildren(...rows.map(r=>{const tr=el('tr',{className:r.tipo==='S'?'s':''});
   tr.append(td(r.codigo),td(r.titulo),td(r.cr),td(dc(r.saldo_anterior),'n'),td(money(r.total_debito),'n'),td(money(r.total_credito),'n'),td(dc(r.saldo_final),'n'));
-  const z=document.createElement('td');if(r.permite_razao){const b=document.createElement('button');b.className='sec';b.textContent='Ver';b.onclick=()=>razao(r);z.append(b)}tr.append(z);return tr}))}catch(e){err(e)}};
+  const z=el('td');if(r.permite_razao){z.append(el('button',{className:'sec sm',textContent:'Ver',onclick:()=>razao(r)}))}tr.append(z);return tr}))}catch(e){err(e)}};
 async function razao(r){try{const q=new URLSearchParams({conta:r.id,de:$('de').value,ate:$('ate').value});
- const rows=await api(`/v1/empresas/${$('emp').value}/razao?`+q);$('dt').textContent=r.codigo+' — '+r.titulo;
- $('rb').replaceChildren(...rows.map(x=>{const tr=document.createElement('tr');tr.append(td(x.data.slice(0,10)),td(x.numero),td(x.documento||''),td(x.conta_contrapartida||''),td(x.debito?money(x.debito):'','n'),td(x.credito?money(x.credito):'','n'),td(dc(x.saldo_acumulado),'n'));return tr}));
+ const rows=await call('GET',`/v1/empresas/${$('emp').value}/razao?`+q);$('dt').textContent=r.codigo+' — '+r.titulo;
+ $('rb').replaceChildren(...rows.map(x=>{const tr=el('tr');tr.append(td(x.data.slice(0,10)),td(x.numero),td(x.documento||''),td(x.conta_contrapartida||''),td(x.debito?money(x.debito):'','n'),td(x.credito?money(x.credito):'','n'),td(dc(x.saldo_acumulado),'n'));return tr}));
  $('dlg').showModal()}catch(e){err(e)}}
 $('fch').onclick=()=>$('dlg').close();
 
-const hist=[];const bolha=(t,q)=>{const d=document.createElement('div');d.style.cssText='margin:6px 0;white-space:pre-wrap;'+(q==='u'?'font-weight:600':'');d.textContent=(q==='u'?'Você: ':'IA: ')+t;$('chat').append(d);$('chat').scrollTop=1e9};
-const apiM=async(m,p,b)=>{const r=await fetch(p,{method:m,headers:{authorization:'Bearer '+$('tok').value,'x-tenant-id':$('ten').value,'content-type':'application/json'},body:b?JSON.stringify(b):undefined});
- const j=await r.json();if(!r.ok)throw new Error(j.erro||('HTTP '+r.status));return j};
+/* ---------- agente de IA ---------- */
+const hist=[];const bolha=(t,q)=>{const d=el('div',{textContent:(q==='u'?'Você: ':'IA: ')+t});d.style.cssText='margin:6px 0;white-space:pre-wrap;'+(q==='u'?'font-weight:600':'');$('chat').append(d);$('chat').scrollTop=1e9};
 const stat=c=>{$('iStatus').textContent=c.configurado?`Chave configurada (${c.origemChave}${c.chaveFinal?', final …'+c.chaveFinal:''}) · modelo ${c.modelo} · uso no mês: ${c.usoTokensMes}/${c.limiteTokensMes} tokens`:'Nenhuma chave configurada.'+(c.criptografiaDisponivel?'':' (servidor sem IA_MASTER_KEY: não é possível salvar chave)');$('imod').value=c.modelo;$('ilim').value=c.limiteTokensMes};
-$('iSalvar').onclick=async()=>{try{$('msg').textContent='';const b={modelo:$('imod').value,limiteTokensMes:Number($('ilim').value)};if($('ikey').value)b.apiKey=$('ikey').value;
- stat(await apiM('PUT','/v1/ia/config',b));$('ikey').value=''}catch(e){err(e)}};
-$('iRemover').onclick=async()=>{try{stat(await apiM('DELETE','/v1/ia/config'))}catch(e){err(e)}};
-$('bEmp').addEventListener('click',()=>setTimeout(async()=>{try{stat(await apiM('GET','/v1/ia/config'))}catch{}},600));
+async function carregarIA(){$('iaCfg').classList.toggle('hide',eu.papel!=='ADMIN');try{stat(await call('GET','/v1/ia/config'))}catch(e){err(e)}}
+$('iSalvar').onclick=async()=>{try{msg('');const b={modelo:$('imod').value,limiteTokensMes:Number($('ilim').value)};if($('ikey').value)b.apiKey=$('ikey').value;stat(await call('PUT','/v1/ia/config',b));$('ikey').value=''}catch(e){err(e)}};
+$('iRemover').onclick=async()=>{try{stat(await call('DELETE','/v1/ia/config'))}catch(e){err(e)}};
 $('iEnv').onclick=async()=>{const t=$('ipg').value.trim();if(!t||!$('emp').value)return;$('ipg').value='';hist.push({role:'user',content:t});bolha(t,'u');
- try{const r=await apiM('POST',`/v1/empresas/${$('emp').value}/ia/chat`,{mensagens:hist.slice(-12)});hist.push({role:'assistant',content:r.resposta});bolha(r.resposta,'a')}catch(e){bolha('Erro: '+e.message,'a')}};
+ try{const r=await call('POST',`/v1/empresas/${$('emp').value}/ia/chat`,{mensagens:hist.slice(-12)});hist.push({role:'assistant',content:r.resposta});bolha(r.resposta,'a')}catch(e){if(e.status===401)return mostrarAuth();bolha('Erro: '+e.message,'a')}};
+
+/* ---------- administração ---------- */
+const PAPEIS=[['ADMIN','Administrador'],['CONTADOR','Contador'],['AUXILIAR','Auxiliar'],['CLIENTE_LEITURA','Cliente (leitura)']];
+const REGIMES=[['SIMPLES_NACIONAL','Simples Nacional'],['LUCRO_PRESUMIDO','Lucro Presumido'],['LUCRO_REAL','Lucro Real'],['LUCRO_ARBITRADO','Lucro Arbitrado'],['IMUNE_ISENTA','Imune/Isenta']];
+const rot=(l,v)=>(l.find(x=>x[0]===v)||[0,v])[1];
+document.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>abaAdm(b.dataset.a));
+function abaAdm(a){for(const x of ['usu','emp','norm'])$('a-'+x).classList.toggle('hide',x!==a);a==='usu'?carregarUsu():a==='emp'?carregarEmp():carregarNormas()}
+async function acao(fn,ok){try{msg('');await fn();if(ok)msg(ok,true)}catch(e){err(e)}}
+
+async function carregarUsu(){try{const l=await call('GET','/v1/admin/usuarios');
+ $('tUsu').replaceChildren(...l.map(u=>{const tr=el('tr',{className:u.ativo?'':'off'});
+  const ac=el('td',{});ac.append(
+   el('button',{className:'sec sm',textContent:'Editar',onclick:()=>formulario('Editar usuário',[{n:'nome',l:'Nome',v:u.nome},{n:'papel',l:'Papel',v:u.papel,opcoes:PAPEIS}],async d=>{await call('PATCH','/v1/admin/usuarios/'+u.id,d);carregarUsu()})}),' ',
+   el('button',{className:'sec sm',textContent:u.ativo?'Desativar':'Ativar',onclick:()=>acao(async()=>{await call('PATCH','/v1/admin/usuarios/'+u.id,{ativo:!u.ativo});carregarUsu()})}),' ',
+   el('button',{className:'sec sm',textContent:'Nova senha',onclick:()=>formulario('Redefinir senha de '+u.nome,[{n:'novaSenha',l:'Nova senha (mín. 10, letras e números)',tipo:'password'}],async d=>{await call('PATCH','/v1/admin/usuarios/'+u.id,d);msg('Senha redefinida; o usuário foi desconectado.',true)})}),' ',
+   el('button',{className:'dng sm',textContent:'Excluir',onclick:()=>{if(confirm('Excluir '+u.nome+'? Esta ação não pode ser desfeita.'))acao(async()=>{await call('DELETE','/v1/admin/usuarios/'+u.id);carregarUsu()})}}));
+  tr.append(td(u.nome),td(u.email),td(rot(PAPEIS,u.papel)),td(u.ativo?'Ativo':'Desativado'),td(u.ultimo_login?new Date(u.ultimo_login).toLocaleString('pt-BR'):'—'),ac);return tr}))}catch(e){err(e)}}
+$('nUsu').onclick=()=>formulario('Novo usuário',[{n:'nome',l:'Nome'},{n:'email',l:'E-mail',tipo:'email'},{n:'papel',l:'Papel',v:'CONTADOR',opcoes:PAPEIS},{n:'senha',l:'Senha inicial (mín. 10, letras e números)',tipo:'password'}],async d=>{await call('POST','/v1/admin/usuarios',d);carregarUsu()});
+
+async function carregarEmp(){try{const l=await call('GET','/v1/admin/empresas');
+ $('tEmp').replaceChildren(...l.map(e=>{const tr=el('tr',{className:e.ativa?'':'off'});const ac=el('td');ac.append(
+   el('button',{className:'sec sm',textContent:'Editar',onclick:()=>formulario('Editar empresa',[{n:'cnpj',l:'CNPJ',v:e.cnpj},{n:'razaoSocial',l:'Razão social',v:e.razao_social},{n:'uf',l:'UF',v:e.uf,maxlength:2},{n:'regime',l:'Regime tributário',v:e.regime_tributario,opcoes:REGIMES}],async d=>{await call('PATCH','/v1/admin/empresas/'+e.id,d);carregarEmp()})}),' ',
+   el('button',{className:'sec sm',textContent:e.ativa?'Desativar':'Ativar',onclick:()=>acao(async()=>{await call('PATCH','/v1/admin/empresas/'+e.id,{ativa:!e.ativa});carregarEmp()})}),' ',
+   el('button',{className:'dng sm',textContent:'Excluir',onclick:()=>{if(confirm('Excluir '+e.razao_social+'?'))acao(async()=>{await call('DELETE','/v1/admin/empresas/'+e.id);carregarEmp()})}}));
+  tr.append(td(fmtCnpj(e.cnpj)),td(e.razao_social),td(e.uf),td(rot(REGIMES,e.regime_tributario)),td(e.ativa?'Ativa':'Inativa'),ac);return tr}))}catch(e){err(e)}}
+$('nEmp').onclick=()=>formulario('Nova empresa',[{n:'cnpj',l:'CNPJ (somente números ou com pontuação)'},{n:'razaoSocial',l:'Razão social'},{n:'uf',l:'UF',maxlength:2},{n:'regime',l:'Regime tributário',v:'SIMPLES_NACIONAL',opcoes:REGIMES}],async d=>{await call('POST','/v1/admin/empresas',d);carregarEmp()});
+
+/* ---------- ferramentas de cálculo ---------- */
+let FERR=null;
+const FMT={brl:v=>'R$ '+money(v),pct:v=>(Number(v)*100).toLocaleString('pt-BR',{maximumFractionDigits:2})+'%',num:v=>Number(v).toLocaleString('pt-BR',{maximumFractionDigits:4}),txt:v=>String(v)};
+async function carregarFerr(){try{if(!FERR){FERR=await call('GET','/v1/ferramentas');const g=[...new Set(FERR.map(f=>f.cat))];$('fCat').replaceChildren(el('option',{value:'',textContent:'Todos'}),...g.map(x=>el('option',{value:x,textContent:x})));$('fBusca').oninput=$('fCat').onchange=listarFerr}listarFerr()}catch(e){err(e)}}
+function listarFerr(){const q=$('fBusca').value.toLowerCase(),c=$('fCat').value;const l=FERR.filter(f=>(!c||f.cat===c)&&(!q||(f.nome+' '+f.desc+' '+f.cat).toLowerCase().includes(q)));$('fQtd').textContent=l.length+' de '+FERR.length+' ferramentas';
+ $('fLista').replaceChildren(...l.map(f=>{const d=el('div',{className:'card',style:'cursor:pointer;margin:0',onclick:()=>abrirFerr(f)});d.append(el('div',{className:'mut',textContent:f.cat,style:'font-size:12px'}),el('b',{textContent:f.nome}),el('div',{className:'mut',textContent:f.desc,style:'font-size:13px;margin-top:4px'}));return d}))}
+function abrirFerr(f){const C=$('fdC');const form=el('div',{style:'display:grid;gap:8px'});const ins={};
+ for(const c of f.campos){let i;if(c.t==='sel')i=el('select',{},...c.op.map(([v,t])=>el('option',{value:v,textContent:t})));else if(c.t==='bool'){i=el('input',{type:'checkbox'});i.checked=!!c.v}else i=el('input',{type:c.t==='data'?'date':'text',inputMode:c.t==='num'?'decimal':'text'});
+  if(c.t!=='bool')i.value=c.v??'';ins[c.n]=i;form.append(el('label',{},c.l,i))}
+ const out=el('div',{});const bt=el('button',{textContent:'Calcular'});
+ bt.onclick=async()=>{try{const e={};for(const c of f.campos)e[c.n]=c.t==='bool'?ins[c.n].checked:ins[c.n].value;const r=await call('POST','/v1/ferramentas/'+f.id,e);
+  const t=el('table');t.append(...r.linhas.map(l=>{const tr=el('tr',{className:l.forte?'s':''});tr.append(td(l.r),td(FMT[l.f](l.v),'n'));return tr}));out.replaceChildren(t,...(r.aviso?[el('p',{className:'mut',textContent:r.aviso})]:[]))}catch(x){if(x.status===401)return mostrarAuth();out.replaceChildren(el('p',{className:'msg',textContent:x.message}))}};
+ C.replaceChildren(el('h3',{textContent:f.nome,style:'margin:0'}),el('div',{className:'mut',textContent:f.desc}),form,bt,out);$('fdlg').showModal()}
+$('fdX').onclick=()=>$('fdlg').close();
+
+/* ---------- normas e tabelas (ADMIN edita) ---------- */
+let CATN=null;
+const dataBR=d=>d?String(d).slice(0,10).split('-').reverse().join('/'):'—';
+async function carregarNormas(){try{if(!CATN){CATN=await call('GET','/v1/normas/categorias');$('nCat').replaceChildren(el('option',{value:'',textContent:'Todas'}),...CATN.map(c=>el('option',{value:c.id,textContent:c.nome})));$('nCat').onchange=carregarNormas}
+ const cat=$('nCat').value;const c=CATN.find(x=>x.id===cat);
+ $('nBotoes').replaceChildren(...(cat&&cat!=='OUTROS'?[el('button',{textContent:'Atualizar '+c.nome,onclick:()=>atualizarCat(cat)}),...c.fontes.map((u,i)=>el('a',{className:'lnk',href:u,target:'_blank',rel:'noopener noreferrer',textContent:'Fonte oficial '+(i+1)}))]:
+   CATN.filter(x=>x.id!=='OUTROS').map(x=>el('button',{className:'sec sm',textContent:'Atualizar '+x.nome,onclick:()=>atualizarCat(x.id)}))));
+ const l=await call('GET','/v1/normas'+(cat?'?categoria='+cat:''));
+ $('tNorm').replaceChildren(...l.map(n=>{const tr=el('tr',{className:n.status==='ARQUIVADO'?'off':''});const ac=el('td');
+  if(n.status==='RASCUNHO')ac.append(el('button',{className:'sm',textContent:'Aprovar',onclick:()=>acao(async()=>{await call('POST','/v1/normas/'+n.id+'/aprovar',{});carregarNormas()},'Rascunho aprovado e vigente.')}),' ');
+  ac.append(el('button',{className:'sec sm',textContent:'Editar',onclick:()=>formNorma(n)}),' ',el('button',{className:'dng sm',textContent:'Excluir',onclick:()=>{if(confirm('Excluir '+n.codigo+'?'))acao(async()=>{await call('DELETE','/v1/normas/'+n.id);carregarNormas()})}}));
+  const v=JSON.stringify(n.valor);tr.append(td(n.codigo),td(n.descricao),td(dataBR(n.vigencia_ini)+' → '+dataBR(n.vigencia_fim)),td(n.status+(n.verificado?' ✔':' (a conferir)')),td(v.length>70?v.slice(0,70)+'…':v),ac);tr.cells[1].style.whiteSpace='normal';return tr}));
+ $('nInfo').textContent=l.length+' registro(s). "a conferir" = ainda não validado por um administrador no ato oficial.'}catch(e){err(e)}}
+function formNorma(n){const novo=!n;formulario(novo?'Nova norma':'Editar '+n.codigo,[
+  {n:'categoria',l:'Categoria',v:n?.categoria||$('nCat').value||'OUTROS',opcoes:CATN.map(c=>[c.id,c.nome])},{n:'codigo',l:'Código (MAIÚSCULAS_COM_UNDERLINE)',v:n?.codigo||''},{n:'descricao',l:'Descrição',v:n?.descricao||''},
+  {n:'vigencia_ini',l:'Início da vigência',tipo:'date',v:n?.vigencia_ini?.slice(0,10)||''},{n:'vigencia_fim',l:'Fim da vigência (vazio = em aberto)',tipo:'date',v:n?.vigencia_fim?.slice(0,10)||''},
+  {n:'status',l:'Status',v:n?.status||'VIGENTE',opcoes:[['VIGENTE','Vigente'],['RASCUNHO','Rascunho'],['ARQUIVADO','Arquivado']]},{n:'verificado',l:'Conferido no ato oficial?',v:n?.verificado?'1':'',opcoes:[['','Não'],['1','Sim']]},
+  {n:'fonte_url',l:'Fonte (URL https)',v:n?.fonte_url||''},{n:'observacao',l:'Observação (ato normativo, nº da portaria...)',v:n?.observacao||''},{n:'valor',l:'Valor (JSON)',area:8,v:n?JSON.stringify(n.valor,null,1):'{}'}],
+  async d=>{d.verificado=!!d.verificado;if(novo)await call('POST','/v1/normas',d);else await call('PATCH','/v1/normas/'+n.id,d);carregarNormas()})}
+$('nNova').onclick=()=>formNorma(null);
+$('nRest').onclick=()=>acao(async()=>{const r=await call('POST','/v1/normas/restaurar',{});carregarNormas();msg(r.inseridos+' norma(s) padrão inserida(s) (as existentes não são sobrescritas).',true)});
+$('nHist').onclick=async()=>{try{const h=await call('GET','/v1/normas/historico');const t=el('table');t.append(el('tr',{},...['Quando','Quem','Código','Ação'].map(x=>el('th',{textContent:x}))),...h.map(x=>{const tr=el('tr');tr.append(td(new Date(x.em).toLocaleString('pt-BR')),td(x.usuario||'—'),td(x.codigo),td(x.acao));return tr}));
+  $('fdC').replaceChildren(el('h3',{textContent:'Histórico de alterações',style:'margin:0'}),el('div',{className:'tw',style:'max-height:60vh'},t));$('fdlg').showModal()}catch(e){err(e)}};
+async function atualizarCat(c){try{msg('Consultando fontes oficiais…',true);const r=await call('POST','/v1/normas/atualizar/'+c,{});
+  $('fdC').replaceChildren(el('h3',{textContent:'Atualização – '+CATN.find(x=>x.id===c).nome,style:'margin:0'}),el('p',{textContent:r.mensagem}),el('b',{textContent:'Fontes consultadas'}),
+   ...r.fontes.map(u=>{const k=r.consultadas.find(x=>x.url===u);return el('div',{},el('a',{className:'lnk',href:u,target:'_blank',rel:'noopener noreferrer',textContent:u}),el('span',{className:'mut',textContent:k?(k.ok?' · lida':' · falhou: '+k.motivo):' · não consultada'}))}));
+  $('fdlg').showModal();msg('');carregarNormas()}catch(e){err(e)}}
+
+(async()=>{try{const c=await call('GET','/auth/config');if(!c.cadastroAberto)$('irCad').classList.add('hide')}catch{}await iniciar()})();
 </script></body></html>
