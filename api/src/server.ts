@@ -17,6 +17,7 @@ import * as registros from './registros.ts';
 import { catalogo, executar, TODAS } from './catalogo.ts';
 import { simular, explicar } from './simulacao.ts';
 import * as sugestao from './sugestao.ts';
+import { TERMOS } from './glossario.ts';
 import { controle as controleSst } from './controle.ts';
 import { catalogo as modelos, redigir as redigirModelo, AVISO as AVISO_DOC } from './modelos-catalogo.ts';
 import * as dadosTeste from './dadostestes.ts';
@@ -74,7 +75,7 @@ const server = http.createServer(async (req, res) => {
 
     let m: RegExpExecArray | null;
     // Ferramentas de cálculo (qualquer papel logado) e Normas (leitura: todos; alteração: ADMIN)
-    if (p.startsWith('/v1/ferramentas') || p.startsWith('/v1/modelos') || p === '/v1/semaforo' || p === '/v1/sugestao/condicoes' || /^\/v1\/registros\/[^/]+\/analisar$/.test(p) || p.startsWith('/v1/normas') || p.startsWith('/v1/registros') || p.startsWith('/v1/funcionarios') || p.startsWith('/v1/cargos') || p.startsWith('/v1/ambientes') || /^\/v1\/empresas\/[^/]+\/(funcionarios|cargos|ambientes)$/.test(p)) {
+    if (p.startsWith('/v1/ferramentas') || p.startsWith('/v1/modelos') || p === '/v1/glossario' || p === '/v1/semaforo' || p === '/v1/sugestao/condicoes' || /^\/v1\/registros\/[^/]+\/analisar$/.test(p) || p.startsWith('/v1/normas') || p.startsWith('/v1/registros') || p.startsWith('/v1/funcionarios') || p.startsWith('/v1/cargos') || p.startsWith('/v1/ambientes') || /^\/v1\/empresas\/[^/]+\/(funcionarios|cargos|ambientes)$/.test(p)) {
       const s = await auth.sessaoDe(req); if (!s) return json(res, 401, { erro: 'não autenticado' });
       const corpo = async () => JSON.parse(await lerCorpo(req, 200_000));
       const qp = url.searchParams;
@@ -91,6 +92,7 @@ const server = http.createServer(async (req, res) => {
         if ((m = new RegExp(`^/v1/empresas/([^/]+)/${rota}$`).exec(p))) { if (req.method === 'GET') return json(res, 200, await mod.listar(s, m[1])); if (req.method === 'POST') return json(res, 201, await mod.criar(s, m[1], await corpo())); }
         if ((m = new RegExp(`^/v1/${rota}/([^/]+)$`).exec(p))) { if (req.method === 'PATCH') return json(res, 200, await mod.editar(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await mod.excluir(s, m[1])); }
       }
+      if (p === '/v1/glossario' && req.method === 'GET') return json(res, 200, TERMOS);
       if (p === '/v1/modelos' && req.method === 'GET') return json(res, 200, { aviso: AVISO_DOC, modelos: modelos() });
       if ((m = /^\/v1\/modelos\/([a-z0-9-]+)\/redigir$/.exec(p)) && req.method === 'POST') { const md = modelos().find(x => x.id === m![1]); if (!md) return json(res, 404, { erro: 'modelo desconhecido' }); return json(res, 200, await redigirModelo(s, md, await corpo())); }
       if (p === '/v1/semaforo' && req.method === 'GET') return json(res, 200, await semaforo(s, qp.get('empresa') ?? undefined));

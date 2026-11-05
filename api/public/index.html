@@ -59,7 +59,7 @@ dialog.pq{width:min(420px,95vw)}
 <!-- ============ Aplicação ============ -->
 <div id="app" class="hide">
 <header><b>ERP Contábil</b>
-  <nav><button data-t="bal" class="on">Balancete</button><button data-t="fun">Funcionários</button><button data-t="fer">Ferramentas</button><button data-t="reg">Registros</button><button data-t="doc">Documentos</button><button data-t="ia">Agente de IA</button><button data-t="adm" id="tAdm" class="hide">Administração</button></nav>
+  <nav><button data-t="bal" class="on">Balancete</button><button data-t="fun">Funcionários</button><button data-t="fer">Ferramentas</button><button data-t="reg">Registros</button><button data-t="doc">Documentos</button><button data-t="glo">Glossário</button><button data-t="ia">Agente de IA</button><button data-t="adm" id="tAdm" class="hide">Administração</button></nav>
   <div class="sp"></div><span id="quem"></span><button class="sec sm" id="bSenha" style="color:#fff;border-color:#fff">Alterar senha</button><button class="sec sm" id="bSair" style="color:#fff;border-color:#fff">Sair</button></header>
 <main>
 <div class="msg" id="msg"></div>
@@ -79,6 +79,11 @@ dialog.pq{width:min(420px,95vw)}
 <div class="sem" id="dAreas"></div>
 <div id="dLista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px"></div>
 <dialog id="ddlg" style="width:min(1100px,96vw);max-height:92vh;padding:0;border:1px solid var(--line);border-radius:10px"><div style="padding:14px"><div class="bar" style="display:flex;justify-content:space-between;align-items:center;margin:0 0 10px"><b id="dTit"></b><button class="sec sm" id="dFechar">Fechar</button></div><div id="dC"></div></div></dialog>
+</section>
+<section id="p-glo" class="hide">
+<div class="bar"><label>Buscar termo<input id="gBusca" placeholder="ex.: ASO, férias, DAS, CA, NR-35..." size="30"></label><button class="sec" id="gLimpar">Limpar</button><span class="mut" id="gQtd"></span></div>
+<div class="sem" id="gAreas"></div><div class="sem" id="gLetras"></div>
+<div id="gLista" style="display:grid;gap:8px"></div>
 </section>
 <section id="p-reg" class="hide">
 <div class="bar" style="flex-wrap:wrap"><label>Empresa<select id="rgEmp"></select></label><label>Área<select id="rgArea"><option value="">Todas</option><option>DP e RH</option><option>SST</option><option>Fiscal e contábil</option></select></label><label>Ferramenta<select id="rgFer"></select></label><label>Buscar<input id="rgQ" placeholder="título, funcionário…"></label>
@@ -174,8 +179,8 @@ $('bSenha').onclick=()=>formulario('Alterar senha',[{n:'senhaAtual',l:'Senha atu
 /* ---------- navegação ---------- */
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{msg('');
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
-  for(const t of ['bal','fun','fer','reg','doc','ia','adm'])$('p-'+t).classList.toggle('hide',t!==b.dataset.t);
-  if(b.dataset.t==='bal')carregarEmpresas();if(b.dataset.t==='ia')carregarIA();if(b.dataset.t==='fer')carregarFerr();if(b.dataset.t==='reg')carregarReg();if(b.dataset.t==='doc')carregarDoc();if(b.dataset.t==='fun')carregarFun();if(b.dataset.t==='adm')abaAdm('usu')});
+  for(const t of ['bal','fun','fer','reg','doc','glo','ia','adm'])$('p-'+t).classList.toggle('hide',t!==b.dataset.t);
+  if(b.dataset.t==='bal')carregarEmpresas();if(b.dataset.t==='ia')carregarIA();if(b.dataset.t==='fer')carregarFerr();if(b.dataset.t==='reg')carregarReg();if(b.dataset.t==='doc')carregarDoc();if(b.dataset.t==='glo')carregarGlo();if(b.dataset.t==='fun')carregarFun();if(b.dataset.t==='adm')abaAdm('usu')});
 
 async function iniciar(){
   try{eu=await call('GET','/auth/me')}catch{mostrarAuth();return}
@@ -315,6 +320,17 @@ async function vencimentos(){try{await garantirFerr();const l=await call('GET','
 $('funVenc').onclick=vencimentos;$('fVenc').onclick=vencimentos;
 
 
+
+/* glossário */
+const GCOR={'Contábil':'#16a34a','Fiscal':'#d97706','DP e RH':'#2563eb','SST':'#dc2626','eSocial':'#0d9488','Sistema':'#6b7280'};let GLO=null,GAREA='',GLET='';
+const gNorm=t=>String(t).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+async function carregarGlo(){try{if(!GLO)GLO=await call('GET','/v1/glossario');if(!$('gBusca').dataset.ok){$('gBusca').dataset.ok='1';$('gBusca').oninput=listarGlo;$('gLimpar').onclick=()=>{GAREA='';GLET='';$('gBusca').value='';listarGlo()}}listarGlo()}catch(e){err(e)}}
+function listarGlo(){const q=gNorm($('gBusca').value),base=GLO.filter(t=>!q||gNorm(t.termo+' '+t.explicacao).includes(q)),areas=Object.keys(GCOR);
+ $('gAreas').replaceChildren(el('button',{className:GAREA?'sec sm':'sm',textContent:'Todas ('+base.length+')',onclick:()=>{GAREA='';GLET='';listarGlo()}}),...areas.map(a=>el('button',{className:'sm',style:GAREA===a?'background:'+GCOR[a]+';color:#fff;border:2px solid '+GCOR[a]+';font-weight:700':'background:#fff;color:'+GCOR[a]+';border:2px solid '+GCOR[a],textContent:a+' ('+base.filter(t=>t.area===a).length+')',onclick:()=>{GAREA=a;GLET='';listarGlo()}})));
+ const porArea=base.filter(t=>!GAREA||t.area===GAREA),letra=t=>gNorm(t.termo)[0].toUpperCase().replace(/[^A-Z]/,'#'),letras=[...new Set(porArea.map(letra))].sort();
+ $('gLetras').replaceChildren(...letras.map(L=>el('button',{className:GLET===L?'sm':'sec sm',textContent:L,onclick:()=>{GLET=GLET===L?'':L;listarGlo()}})));
+ const l=porArea.filter(t=>!GLET||letra(t)===GLET);$('gQtd').textContent=l.length+' de '+GLO.length+' termos';
+ $('gLista').replaceChildren(...(l.length?l.map(t=>{const d=el('div',{className:'card',style:'margin:0;border-left:4px solid '+GCOR[t.area]+';background:'+GCOR[t.area]+'0d'});d.append(el('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap'},el('b',{textContent:t.termo,style:'font-size:15px'}),el('span',{className:'tag',style:'color:'+GCOR[t.area]+';border-color:'+GCOR[t.area],textContent:t.area})),el('div',{textContent:t.explicacao,style:'margin-top:4px;font-size:14px;line-height:1.45'}));return d}):[el('p',{className:'mut',textContent:'Nenhum termo encontrado.'})]))}
 /* documentos (relatórios, laudos e modelos) */
 const DCOR={SST:'#dc2626','DP e RH':'#2563eb','Contábil':'#16a34a','Gestão':'#7c3aed'};let MODS=null,DAREA='';
 async function carregarDoc(){try{await empresas();if(!MODS){const r=await call('GET','/v1/modelos');MODS=r.modelos;window.AVISO_DOC=r.aviso}if(!$('dBusca').dataset.ok){$('dBusca').dataset.ok='1';$('dBusca').oninput=$('dCat').onchange=listarDoc;$('dLimpar').onclick=()=>{DAREA='';$('dBusca').value='';$('dCat').value='';listarDoc()};$('dFechar').onclick=()=>$('ddlg').close()}listarDoc()}catch(e){err(e)}}
