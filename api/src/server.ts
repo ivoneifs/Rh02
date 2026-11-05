@@ -16,6 +16,7 @@ import * as pessoal from './pessoal.ts';
 import * as registros from './registros.ts';
 import { catalogo, executar, TODAS } from './catalogo.ts';
 import { simular, explicar } from './simulacao.ts';
+import * as dadosTeste from './dadostestes.ts';
 import { ErroCalc } from './ferramentas.ts';
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -103,6 +104,7 @@ const server = http.createServer(async (req, res) => {
       const corpo = async () => JSON.parse(await lerCorpo(req, 20_000));
       if (p === '/v1/admin/usuarios') { if (req.method === 'GET') return json(res, 200, await auth.listarUsuarios(s)); if (req.method === 'POST') return json(res, 201, await auth.criarUsuario(s, await corpo())); }
       if ((m = /^\/v1\/admin\/usuarios\/([^/]+)$/.exec(p))) { if (req.method === 'PATCH') return json(res, 200, await auth.editarUsuario(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await auth.excluirUsuario(s, m[1])); }
+      if (p === '/v1/admin/dados-teste') { if (req.method === 'GET') return json(res, 200, await dadosTeste.resumo(s)); if (req.method === 'POST') return json(res, 201, await dadosTeste.gerar(s)); if (req.method === 'DELETE') return json(res, 200, await dadosTeste.remover(s)); }
       if (p === '/v1/admin/empresas') { if (req.method === 'GET') return json(res, 200, await auth.listarEmpresasAdmin(s)); if (req.method === 'POST') return json(res, 201, await auth.criarEmpresa(s, await corpo())); }
       if ((m = /^\/v1\/admin\/empresas\/([^/]+)$/.exec(p))) { if (req.method === 'PATCH') return json(res, 200, await auth.editarEmpresa(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await auth.excluirEmpresa(s, m[1])); }
       return json(res, 404, { erro: 'rota não encontrada' });

@@ -86,7 +86,7 @@ dialog.pq{width:min(420px,95vw)}
 <div class="tabs"><button class="sec sm" data-a="usu">Usuários</button><button class="sec sm" data-a="emp">Empresas</button><button class="sec sm" data-a="norm">Normas e tabelas</button><button class="sec sm" data-a="ia">Configuração da IA</button></div>
 <div id="a-usu"><div class="bar"><button id="nUsu">+ Novo usuário</button></div>
 <div class="tw"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Situação</th><th>Último acesso</th><th>Ações</th></tr></thead><tbody id="tUsu"></tbody></table></div></div>
-<div id="a-emp" class="hide"><div class="bar"><button id="nEmp">+ Nova empresa</button></div>
+<div id="a-emp" class="hide"><div class="bar"><button id="nEmp">+ Nova empresa</button><button class="sec" id="dtGerar">Gerar dados de teste (5 empresas · 60 funcionários)</button><button class="dng" id="dtRemover">Remover dados de teste</button></div><p class="mut" id="dtInfo" style="margin:4px 0"></p>
 <div class="tw"><table><thead><tr><th>CNPJ</th><th>Razão social</th><th>UF</th><th>Regime</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="tEmp"></tbody></table></div></div>
 <div id="a-ia" class="hide"><div class="card"><h3 style="margin:0 0 8px">Configuração da IA (OpenAI)</h3><p class="mut" style="margin:0 0 8px">Somente administradores. A chave é guardada criptografada e nunca é exibida; para trocar, informe a nova e salve.</p>
 <div class="bar" style="border:0;padding:0" id="iaCfg">
@@ -192,7 +192,7 @@ const PAPEIS=[['ADMIN','Administrador'],['CONTADOR','Contador'],['AUXILIAR','Aux
 const REGIMES=[['SIMPLES_NACIONAL','Simples Nacional'],['LUCRO_PRESUMIDO','Lucro Presumido'],['LUCRO_REAL','Lucro Real'],['LUCRO_ARBITRADO','Lucro Arbitrado'],['IMUNE_ISENTA','Imune/Isenta']];
 const rot=(l,v)=>(l.find(x=>x[0]===v)||[0,v])[1];
 document.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>abaAdm(b.dataset.a));
-function abaAdm(a){for(const x of ['usu','emp','norm','ia'])$('a-'+x).classList.toggle('hide',x!==a);a==='usu'?carregarUsu():a==='emp'?carregarEmp():a==='ia'?carregarIA():carregarNormas()}
+function abaAdm(a){for(const x of ['usu','emp','norm','ia'])$('a-'+x).classList.toggle('hide',x!==a);a==='usu'?carregarUsu():a==='emp'?(carregarEmp(),infoTeste()):a==='ia'?carregarIA():carregarNormas()}
 async function acao(fn,ok){try{msg('');await fn();if(ok)msg(ok,true)}catch(e){err(e)}}
 
 async function carregarUsu(){try{const l=await call('GET','/v1/admin/usuarios');
@@ -203,6 +203,9 @@ async function carregarUsu(){try{const l=await call('GET','/v1/admin/usuarios');
    el('button',{className:'sec sm',textContent:'Nova senha',onclick:()=>formulario('Redefinir senha de '+u.nome,[{n:'novaSenha',l:'Nova senha (mín. 10, letras e números)',tipo:'password'}],async d=>{await call('PATCH','/v1/admin/usuarios/'+u.id,d);msg('Senha redefinida; o usuário foi desconectado.',true)})}),' ',
    el('button',{className:'dng sm',textContent:'Excluir',onclick:()=>{if(confirm('Excluir '+u.nome+'? Esta ação não pode ser desfeita.'))acao(async()=>{await call('DELETE','/v1/admin/usuarios/'+u.id);carregarUsu()})}}));
   tr.append(td(u.nome),td(u.email),td(rot(PAPEIS,u.papel)),td(u.ativo?'Ativo':'Desativado'),td(u.ultimo_login?new Date(u.ultimo_login).toLocaleString('pt-BR'):'—'),ac);return tr}))}catch(e){err(e)}}
+async function infoTeste(){try{const r=await call('GET','/v1/admin/dados-teste');$('dtInfo').textContent=r.empresas?`Dados de teste presentes: ${r.empresas} empresa(s) e ${r.funcionarios} funcionário(s) (razão social começa com "TESTE - ").`:''}catch(e){}}
+$('dtGerar').onclick=()=>acao(async()=>{const r=await call('POST','/v1/admin/dados-teste',{});await carregarEmp();infoTeste();msg('Criados: '+r.empresas+' empresas, '+r.funcionarios+' funcionários e '+r.registros+' registros de ASO (fictícios).',true)});
+$('dtRemover').onclick=()=>{if(confirm('Remover TODAS as empresas "TESTE - ", seus funcionários, cargos, ambientes e registros?'))acao(async()=>{const r=await call('DELETE','/v1/admin/dados-teste');await carregarEmp();infoTeste();msg(r.removidas+' empresa(s) de teste removida(s) com seus dados.',true)})};
 $('nUsu').onclick=()=>formulario('Novo usuário',[{n:'nome',l:'Nome'},{n:'email',l:'E-mail',tipo:'email'},{n:'papel',l:'Papel',v:'CONTADOR',opcoes:PAPEIS},{n:'senha',l:'Senha inicial (mín. 10, letras e números)',tipo:'password'}],async d=>{await call('POST','/v1/admin/usuarios',d);carregarUsu()});
 
 async function carregarEmp(){try{const l=await call('GET','/v1/admin/empresas');
