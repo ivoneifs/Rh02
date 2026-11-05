@@ -17,7 +17,7 @@ const limpa = (v: unknown, n: number) => String(v ?? '').replace(/[\u0000-\u001f
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const dataOuNull = (v: unknown, campo: string) => { if (v == null || v === '') return null; const s = String(v); if (!ISO.test(s) || isNaN(Date.parse(s))) throw new ErroAuth(422, `${campo} inválida (use AAAA-MM-DD).`); return s; };
 const tipoOk = (v: unknown) => { const t = String(v ?? '').toUpperCase(); if (!/^[A-Z0-9_:\-]{2,40}$/.test(t)) throw new ErroAuth(422, 'Tipo de documento inválido.'); return t; };
-const COLS = `id, funcionario_id, empresa_id, tipo, titulo, nome_arquivo, mime, tamanho, to_char(data_emissao,'YYYY-MM-DD') AS data_emissao, to_char(data_validade,'YYYY-MM-DD') AS data_validade, analise, analisado_em, status, obs, criado_em`;
+const COLS = `id, funcionario_id, empresa_id, tipo, lado, titulo, nome_arquivo, mime, tamanho, to_char(data_emissao,'YYYY-MM-DD') AS data_emissao, to_char(data_validade,'YYYY-MM-DD') AS data_validade, analise, analisado_em, status, obs, criado_em`;
 
 async function contexto(s: Sessao, funcId: string) {
   if (!isUuid(funcId)) throw new ErroAuth(400, 'id inválido');
@@ -39,12 +39,13 @@ export async function enviar(s: Sessao, funcId: string, b: any) {
   const buf = Buffer.from(b.base64, 'base64'); if (!buf.length) throw new ErroAuth(422, 'Arquivo vazio.');
   if (buf.length > MAX_BYTES) throw new ErroAuth(413, `Arquivo acima de ${MAX_BYTES / 1e6} MB.`);
   const mime = mimePorBytes(buf); if (!mime) throw new ErroAuth(415, 'Envie PDF, JPEG, PNG ou WEBP.');
+  const lado = b.lado == null || b.lado === '' ? 'UNICO' : String(b.lado).toUpperCase(); if (!['UNICO', 'FRENTE', 'VERSO'].includes(lado)) throw new ErroAuth(422, 'Lado inválido (UNICO, FRENTE ou VERSO).');
   const tipo = tipoOk(b.tipo), em = dataOuNull(b.data_emissao, 'Emissão'), va = dataOuNull(b.data_validade, 'Validade');
   return tx(s, async t => {
     const n = (await t.query('SELECT count(*)::int AS n FROM docs_func WHERE funcionario_id=$1', [funcId])).rows[0].n;
     if (n >= MAX_POR_FUNC) throw new ErroAuth(422, `Limite de ${MAX_POR_FUNC} arquivos por colaborador.`);
-    return (await t.query(`INSERT INTO docs_func (tenant_id, empresa_id, funcionario_id, tipo, titulo, nome_arquivo, mime, tamanho, dados, data_emissao, data_validade, criado_por) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING ${COLS}`,
-      [s.tenantId, f.empresa_id, funcId, tipo, limpa(b.titulo, 150) || null, limpa(b.nome, 150) || 'documento', mime, buf.length, buf, em, va, s.usuarioId])).rows[0];
+    return (await t.query(`INSERT INTO docs_func (tenant_id, empresa_id, funcionario_id, tipo, titulo, nome_arquivo, mime, tamanho, dados, data_emissao, data_validade, criado_por, lado) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING ${COLS}`,
+      [s.tenantId, f.empresa_id, funcId, tipo, limpa(b.titulo, 150) || null, limpa(b.nome, 150) || 'documento', mime, buf.length, buf, em, va, s.usuarioId, lado])).rows[0];
   });
 }
 export async function obter(s: Sessao, id: string) {
@@ -83,7 +84,7 @@ export async function analisar(s: Sessao, id: string, ia: typeof executarAgente 
   let j: any; try { j = JSON.parse(resp.replace(/^```(?:json)?|```$/gm, '').trim()); } catch { throw new ErroAuth(502, 'A IA não devolveu uma leitura válida. Tente novamente ou use um arquivo mais nítido.'); }
   const str = (x: any, n = 120) => typeof x === 'string' ? x.slice(0, n) : undefined;
   const ex = { legivel: j?.legivel !== false, tipo_detectado: str(j?.tipo_detectado), titular: str(j?.titular), data_emissao: str(j?.data_emissao, 10), data_validade: str(j?.data_validade, 10), entidade: str(j?.entidade), curso: str(j?.curso), carga_horaria: Number.isFinite(Number(j?.carga_horaria)) ? Number(j.carga_horaria) : undefined, resultado: str(j?.resultado, 30) };
-  const v = veredito(ex, { tipo: d.tipo, nome_funcionario: f.nome, hoje: hojeIso(), data_validade_informada: d.data_validade, reciclagem_meses: slot?.reciclagem_meses ?? null });
+  const v = veredito(ex, { tipo: d.tipo, nome_funcionario: f.nome, hoje: hojeIso(), lado: d.lado, data_validade_informada: d.data_validade, reciclagem_meses: slot?.reciclagem_meses ?? null });
   const analise = { ...v, analisado_por: 'IA', aviso: 'Leitura automática: confira com o documento original.' };
   await tx(s, async t => { await t.query('UPDATE docs_func SET analise=$2::jsonb, analisado_em=now(), data_emissao=COALESCE(data_emissao,$3), data_validade=COALESCE(data_validade,$4) WHERE id=$1', [id, JSON.stringify(analise), v.data_emissao, v.data_validade]); });
   return analise;
@@ -92,7 +93,7 @@ export async function analisar(s: Sessao, id: string, ia: typeof executarAgente 
 /** Visão geral da empresa: por colaborador ativo, quantos documentos exigidos já estão na pasta e quantos vencidos/a vencer. */
 export async function resumoEmpresa(s: Sessao, empresa: string) {
   const fs: any[] = (await pessoal.listarFuncionarios(s, empresa, undefined, true)).slice(0, 500), P = await vigentes(s), hoje = hojeIso();
-  const docs: any[] = await tx(s, async t => (await t.query(`SELECT funcionario_id, tipo, status, to_char(data_validade,'YYYY-MM-DD') AS data_validade, criado_em FROM docs_func WHERE empresa_id=$1 AND status<>'REJEITADO'`, [empresa])).rows);
+  const docs: any[] = await tx(s, async t => (await t.query(`SELECT funcionario_id, tipo, lado, status, to_char(data_validade,'YYYY-MM-DD') AS data_validade, criado_em FROM docs_func WHERE empresa_id=$1 AND status<>'REJEITADO'`, [empresa])).rows);
   const por = new Map<string, any[]>(); for (const d of docs) (por.get(d.funcionario_id) ?? por.set(d.funcionario_id, []).get(d.funcionario_id)!).push(d);
   return fs.map(f => { const ex = exigidos([f.cargo_nome, f.funcao, f.setor].filter(Boolean).join(' '), P.TREINAMENTOS_FUNCAO, P.TREINAMENTOS_NR ?? {});
     const c = montarChecklist(slotsNecessarios({ sexo: f.sexo, dependentes: f.dependentes, funcao: f.funcao, cargo: f.cargo_nome }, ex.itens), por.get(f.id) ?? [], hoje).resumo;
@@ -102,12 +103,12 @@ export async function resumoEmpresa(s: Sessao, empresa: string) {
 /** Pasta do colaborador em ZIP (sem compressão), organizada em subpastas por tipo. */
 export async function zipPasta(s: Sessao, funcId: string) {
   const { f, slots } = await contexto(s, funcId);
-  const docs: any[] = await tx(s, async t => (await t.query('SELECT tipo, nome_arquivo, mime, dados, to_char(criado_em,\'YYYYMMDD\') AS dia FROM docs_func WHERE funcionario_id=$1 ORDER BY criado_em', [funcId])).rows);
+  const docs: any[] = await tx(s, async t => (await t.query('SELECT tipo, lado, nome_arquivo, mime, dados, to_char(criado_em,\'YYYYMMDD\') AS dia FROM docs_func WHERE funcionario_id=$1 ORDER BY criado_em', [funcId])).rows);
   if (!docs.length) throw new ErroAuth(404, 'A pasta ainda não tem arquivos.');
   const raiz = String(f.nome ?? 'colaborador').replace(/[^\p{L}\p{N} ._-]/gu, '').trim().slice(0, 60) + (f.matricula ? ` (${String(f.matricula).replace(/[^\w-]/g, '')})` : ''); const hoje = new Date(), dt = (hoje.getUTCHours() << 11) | (hoje.getUTCMinutes() << 5) | (hoje.getUTCSeconds() >> 1), dd = ((hoje.getUTCFullYear() - 1980) << 9) | ((hoje.getUTCMonth() + 1) << 5) | hoje.getUTCDate(); const parts: Buffer[] = [], cen: Buffer[] = []; let off = 0; const usados = new Set<string>();
   for (const d of docs) {
     const sl = slots.find(x => x.tipo === d.tipo), seg = (v: string) => v.replace(/[^\p{L}\p{N} ._()-]/gu, '_').replace(/\s+/g, ' ').trim().slice(0, 80);
-    let nome = `${raiz}/${seg(sl?.grupo ?? 'Outros documentos')}/${seg(sl?.nome ?? d.tipo)} - ${d.dia} - ${seg(String(d.nome_arquivo))}`; while (usados.has(nome)) nome = nome.replace(/(\.[^.]*)?$/, '_2$1'); usados.add(nome);
+    let nome = `${raiz}/${seg(sl?.grupo ?? 'Outros documentos')}/${seg(sl?.nome ?? d.tipo)}${d.lado === 'FRENTE' ? ' (frente)' : d.lado === 'VERSO' ? ' (verso)' : ''} - ${d.dia} - ${seg(String(d.nome_arquivo))}`; while (usados.has(nome)) nome = nome.replace(/(\.[^.]*)?$/, '_2$1'); usados.add(nome);
     const n = Buffer.from(nome, 'utf8'), data: Buffer = Buffer.from(d.dados), c = crc32(data) >>> 0;
     const h = Buffer.alloc(30); h.writeUInt32LE(0x04034b50, 0); h.writeUInt16LE(20, 4); h.writeUInt16LE(0x0800, 6); h.writeUInt16LE(dt, 10); h.writeUInt16LE(dd, 12); h.writeUInt32LE(c, 14); h.writeUInt32LE(data.length, 18); h.writeUInt32LE(data.length, 22); h.writeUInt16LE(n.length, 26);
     const e = Buffer.alloc(46); e.writeUInt32LE(0x02014b50, 0); e.writeUInt16LE(20, 4); e.writeUInt16LE(20, 6); e.writeUInt16LE(0x0800, 8); e.writeUInt16LE(dt, 12); e.writeUInt16LE(dd, 14); e.writeUInt32LE(c, 16); e.writeUInt32LE(data.length, 20); e.writeUInt32LE(data.length, 24); e.writeUInt16LE(n.length, 28); e.writeUInt32LE(off, 42);

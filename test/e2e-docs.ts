@@ -37,8 +37,14 @@ try {
   // arquivo e zip
   r = await A.r('GET', `/v1/docs/${did}`, undefined, true); assert.equal(r.s, 200); assert.equal(r.h.get('content-type'), 'application/pdf'); assert.equal(r.h.get('x-content-type-options'), 'nosniff'); assert.ok(r.buf.subarray(0, 5).toString() === '%PDF-');
   r = await A.r('GET', `/v1/funcionarios/${fid}/docs.zip`, undefined, true); assert.equal(r.s, 200); assert.equal(r.buf.readUInt32LE(0), 0x04034b50); assert.ok(r.buf.includes(Buffer.from('aso.pdf'))); require_zip(r.buf);
+  // frente e verso
+  r = await A.r('POST', `/v1/funcionarios/${fid}/docs`, { tipo: 'RG', nome: 'rg-f.pdf', base64: pdf, lado: 'FRENTE' }); assert.equal(r.s, 201); assert.equal(r.j.lado, 'FRENTE');
+  r = await A.r('POST', `/v1/funcionarios/${fid}/docs`, { tipo: 'RG', nome: 'x.pdf', base64: pdf, lado: 'TRAS' }); assert.equal(r.s, 422);
+  r = await A.r('GET', `/v1/funcionarios/${fid}/docs`); let rg = r.j.itens.find((i: any) => i.tipo === 'RG'); assert.equal(rg.situacao, 'INCOMPLETO'); assert.equal(rg.falta, 'verso');
+  r = await A.r('POST', `/v1/funcionarios/${fid}/docs`, { tipo: 'RG', nome: 'rg-v.pdf', base64: pdf, lado: 'VERSO' }); assert.equal(r.s, 201);
+  r = await A.r('GET', `/v1/funcionarios/${fid}/docs`); rg = r.j.itens.find((i: any) => i.tipo === 'RG'); assert.equal(rg.situacao, 'ENVIADO'); assert.ok(rg.lados.FRENTE && rg.lados.VERSO);
   // resumo
-  r = await A.r('GET', `/v1/empresas/${emp}/docs-resumo`); assert.equal(r.s, 200); assert.equal(r.j[0].completos, 1);
+  r = await A.r('GET', `/v1/empresas/${emp}/docs-resumo`); assert.equal(r.s, 200); assert.equal(r.j[0].completos, 2);
   // isolamento
   r = await B.r('POST', '/auth/cadastro', { nome: 'Bia', escritorio: 'Outro ' + sfx, email: `o.${sfx}@t.com`, senha: SENHA }); assert.equal(r.s, 201);
   r = await B.r('GET', `/v1/docs/${did}`, undefined, true); assert.equal(r.s, 404); r = await B.r('GET', `/v1/funcionarios/${fid}/docs`); assert.equal(r.s, 404);

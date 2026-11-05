@@ -1,20 +1,21 @@
 // Pasta do funcionário: catálogo de documentos necessários, situação por prazo e veredito da análise da IA.
 // Funções puras (testáveis); o acesso ao banco fica em docs-rotas.ts.
-export type Situacao = 'PENDENTE' | 'ENVIADO' | 'EM_DIA' | 'A_VENCER' | 'VENCIDO';
-export interface Slot { tipo: string; nome: string; grupo: string; com_validade: boolean; conferir?: string; horas?: number | null; reciclagem_meses?: number | null }
+export type Situacao = 'PENDENTE' | 'INCOMPLETO' | 'ENVIADO' | 'EM_DIA' | 'A_VENCER' | 'VENCIDO';
+export interface Slot { tipo: string; nome: string; grupo: string; com_validade: boolean; frente_verso?: boolean; conferir?: string; horas?: number | null; reciclagem_meses?: number | null }
 export const GRUPOS = ['Documentos pessoais e admissão', 'Dependentes', 'Contrato e Departamento Pessoal', 'Saúde ocupacional', 'Segurança e treinamentos'] as const;
 
 const norm = (t: unknown) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 const G = GRUPOS;
+const FV = new Set(['RG', 'CTPS', 'TITULO', 'CNH']);
 const PESSOAIS: [string, string, string?][] = [['RG', 'RG (identidade)'], ['CPF', 'CPF'], ['CTPS', 'CTPS (carteira de trabalho)'], ['PIS', 'PIS/NIS'], ['COMP_RES', 'Comprovante de residência'], ['TITULO', 'Título de eleitor'], ['FOTO', 'Foto 3x4'], ['CERT_CIVIL', 'Certidão de nascimento/casamento'], ['ESCOLARIDADE', 'Comprovante de escolaridade'], ['BANCO', 'Dados bancários (comprovante de conta)']];
 
 export interface PerfilFunc { sexo?: string | null; dependentes?: number | null; funcao?: string | null; cargo?: string | null; setor?: string | null; tipo_contrato?: string | null }
 /** Lista os documentos esperados para o colaborador. `treinos` vem de integracao.exigidos(). Nada aqui inventa prazo legal. */
 export function slotsNecessarios(f: PerfilFunc, treinos: { cod: string; nome: string; horas: number | null; reciclagem_meses: number | null }[]): Slot[] {
   const o: Slot[] = [];
-  for (const [t, n] of PESSOAIS) o.push({ tipo: t, nome: n, grupo: G[0], com_validade: false });
+  for (const [t, n] of PESSOAIS) o.push({ tipo: t, nome: n, grupo: G[0], com_validade: false, frente_verso: FV.has(t) });
   if (f.sexo === 'M') o.push({ tipo: 'RESERVISTA', nome: 'Certificado de reservista', grupo: G[0], com_validade: false, conferir: 'Exigência depende do caso – a conferir' });
-  if (/motorista|condutor|operador de (empilhadeira|m[aá]quina)/i.test(`${f.funcao ?? ''} ${f.cargo ?? ''}`)) o.push({ tipo: 'CNH', nome: 'CNH', grupo: G[0], com_validade: true });
+  if (/motorista|condutor|operador de (empilhadeira|m[aá]quina)/i.test(`${f.funcao ?? ''} ${f.cargo ?? ''}`)) o.push({ tipo: 'CNH', nome: 'CNH', grupo: G[0], com_validade: true, frente_verso: true });
   if ((f.dependentes ?? 0) > 0) for (const [t, n] of [['DEP_CERTIDAO', 'Certidão de nascimento dos dependentes'], ['DEP_CPF', 'CPF dos dependentes'], ['DEP_VACINA_ESCOLA', 'Vacinação/matrícula escolar dos dependentes']] as const)
     o.push({ tipo: t, nome: n, grupo: G[1], com_validade: false, conferir: t === 'DEP_VACINA_ESCOLA' ? 'Exigência e periodicidade – a conferir' : undefined });
   for (const [t, n] of [['FICHA_REGISTRO', 'Ficha/livro de registro'], ['CONTRATO', 'Contrato de trabalho'], ['TERMO_VT', 'Termo de vale-transporte (opção/dispensa)'], ['TERMO_LGPD', 'Termo de ciência LGPD']] as const) o.push({ tipo: t, nome: n, grupo: G[2], com_validade: false });
@@ -37,12 +38,17 @@ export function situacaoDoc(doc: { data_validade?: string | null } | null | unde
 /** Combina slots e arquivos: usa o arquivo mais recente de cada tipo; os demais ficam como histórico. */
 export function montarChecklist(slots: Slot[], docs: any[], hoje: string) {
   const por = new Map<string, any[]>(); for (const d of docs) (por.get(d.tipo) ?? por.set(d.tipo, []).get(d.tipo)!).push(d);
-  const itens = slots.map(s => { const l = (por.get(s.tipo) ?? []).slice().sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em))); const atual = l.find(d => d.status !== 'REJEITADO') ?? null;
-    return { ...s, doc: atual, historico: l.filter(d => d !== atual).map(d => d.id), situacao: situacaoDoc(atual, hoje) as Situacao, dias: atual?.data_validade ? dias(atual.data_validade, hoje) : null }; });
+  const itens = slots.map(s => { const l = (por.get(s.tipo) ?? []).slice().sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em))).filter(d => d.status !== 'REJEITADO');
+    if (s.frente_verso) { const por_lado = (x: string) => l.find(d => (d.lado ?? 'UNICO') === x) ?? null, un = por_lado('UNICO'), fr = por_lado('FRENTE'), ve = por_lado('VERSO');
+      const atual = un ?? fr ?? ve, completo = !!un || (!!fr && !!ve), val = [un, fr, ve].find(d => d?.data_validade) ?? atual;
+      const sit: Situacao = !atual ? 'PENDENTE' : !completo ? 'INCOMPLETO' : situacaoDoc(val, hoje);
+      return { ...s, doc: atual, lados: { UNICO: un, FRENTE: fr, VERSO: ve }, falta: !atual ? null : completo ? null : fr ? 'verso' : 'frente', historico: l.filter(d => ![un, fr, ve].includes(d)).map(d => d.id), situacao: sit, dias: val?.data_validade ? dias(val.data_validade, hoje) : null }; }
+    const atual = l[0] ?? null;
+    return { ...s, doc: atual, lados: null as any, falta: null as any, historico: l.slice(1).map(d => d.id), situacao: situacaoDoc(atual, hoje) as Situacao, dias: atual?.data_validade ? dias(atual.data_validade, hoje) : null }; });
   const tipos = new Set(slots.map(s => s.tipo));
-  const extras = docs.filter(d => !tipos.has(d.tipo)).map(d => ({ tipo: d.tipo, nome: d.titulo || d.tipo, grupo: 'Outros documentos', com_validade: !!d.data_validade, doc: d, historico: [], situacao: situacaoDoc(d, hoje), dias: d.data_validade ? dias(d.data_validade, hoje) : null }));
+  const extras = docs.filter(d => !tipos.has(d.tipo)).map(d => ({ tipo: d.tipo, nome: d.titulo || d.tipo, grupo: 'Outros documentos', com_validade: !!d.data_validade, frente_verso: false, doc: d, lados: null as any, falta: null as any, historico: [], situacao: situacaoDoc(d, hoje), dias: d.data_validade ? dias(d.data_validade, hoje) : null }));
   const todos = [...itens, ...extras], c = (x: Situacao) => todos.filter(i => i.situacao === x).length;
-  return { itens: todos, resumo: { total: itens.length, pendentes: c('PENDENTE'), enviados: c('ENVIADO'), em_dia: c('EM_DIA'), a_vencer: c('A_VENCER'), vencidos: c('VENCIDO'), completos: itens.length - itens.filter(i => i.situacao === 'PENDENTE').length } };
+  return { itens: todos, resumo: { total: itens.length, pendentes: c('PENDENTE'), incompletos: c('INCOMPLETO'), enviados: c('ENVIADO'), em_dia: c('EM_DIA'), a_vencer: c('A_VENCER'), vencidos: c('VENCIDO'), completos: itens.length - itens.filter(i => i.situacao === 'PENDENTE' || i.situacao === 'INCOMPLETO').length } };
 }
 
 /** Descobre o tipo real do arquivo pelos bytes. */
@@ -69,15 +75,15 @@ export function coerente(tipoSlot: string, detectado: string): boolean | null {
 }
 export interface Extracao { legivel?: boolean; tipo_detectado?: string; titular?: string; data_emissao?: string; data_validade?: string; entidade?: string; curso?: string; carga_horaria?: number | string; resultado?: string; observacoes?: string }
 /** Veredito calculado pelo servidor (a IA só extrai; prazo e comparação são feitos aqui). */
-export function veredito(ex: Extracao, ctx: { tipo: string; nome_funcionario: string; hoje: string; data_validade_informada?: string | null; aviso?: number; reciclagem_meses?: number | null }) {
+export function veredito(ex: Extracao, ctx: { tipo: string; nome_funcionario: string; hoje: string; lado?: string; data_validade_informada?: string | null; aviso?: number; reciclagem_meses?: number | null }) {
   const alertas: { nivel: 'ERRO' | 'AVISO' | 'OK'; texto: string }[] = [];
   const emissao = valida(dataIso(ex.data_emissao)); let validade = valida(dataIso(ex.data_validade)) ?? valida(ctx.data_validade_informada ?? null);
   let validadeCalculada = false;
   if (!validade && emissao && ctx.reciclagem_meses) { const d = new Date(emissao + 'T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() + ctx.reciclagem_meses); validade = d.toISOString().slice(0, 10); validadeCalculada = true; }
   if (ex.legivel === false) alertas.push({ nivel: 'ERRO', texto: 'Documento ilegível ou incompleto – envie uma cópia melhor.' });
   if (ex.titular && !mesmoNome(ex.titular, ctx.nome_funcionario)) alertas.push({ nivel: 'ERRO', texto: `O nome no documento (“${String(ex.titular).slice(0, 80)}”) não parece ser do colaborador (${ctx.nome_funcionario}).` });
-  else if (!ex.titular && ex.legivel !== false) alertas.push({ nivel: 'AVISO', texto: 'A IA não identificou o nome do titular – confira manualmente.' });
-  const co = coerente(ctx.tipo, ex.tipo_detectado ?? ''); if (co === false) alertas.push({ nivel: 'AVISO', texto: `O arquivo parece ser “${String(ex.tipo_detectado).slice(0, 60)}”, diferente do item escolhido.` });
+  else if (!ex.titular && ex.legivel !== false && ctx.lado !== 'VERSO') alertas.push({ nivel: 'AVISO', texto: 'A IA não identificou o nome do titular – confira manualmente.' });
+  const co = ctx.lado === 'VERSO' ? null : coerente(ctx.tipo, ex.tipo_detectado ?? ''); if (co === false) alertas.push({ nivel: 'AVISO', texto: `O arquivo parece ser “${String(ex.tipo_detectado).slice(0, 60)}”, diferente do item escolhido.` });
   if (/inapt/i.test(String(ex.resultado ?? ''))) alertas.push({ nivel: 'ERRO', texto: 'O documento indica resultado INAPTO – procure o SST/medicina do trabalho.' });
   const sit = situacaoDoc({ data_validade: validade }, ctx.hoje, ctx.aviso ?? 30);
   if (validade) { const dd = dias(validade, ctx.hoje);
@@ -85,7 +91,7 @@ export function veredito(ex: Extracao, ctx: { tipo: string; nome_funcionario: st
     else if (sit === 'A_VENCER') alertas.push({ nivel: 'AVISO', texto: `Vence em ${dd} dia(s) (${validade.split('-').reverse().join('/')}) – agende a renovação.` });
     else alertas.push({ nivel: 'OK', texto: `Dentro do prazo até ${validade.split('-').reverse().join('/')} (${dd} dias).` });
     if (validadeCalculada) alertas.push({ nivel: 'AVISO', texto: `Validade calculada pela emissão + ${ctx.reciclagem_meses} meses (periodicidade do cadastro – a conferir).` });
-  } else alertas.push({ nivel: 'AVISO', texto: 'Não encontrei data de validade – informe manualmente se o documento tiver prazo.' });
+  } else if (ctx.lado !== 'VERSO') alertas.push({ nivel: 'AVISO', texto: 'Não encontrei data de validade – informe manualmente se o documento tiver prazo.' });
   const nivel = alertas.some(a => a.nivel === 'ERRO') ? 'ERRO' : alertas.some(a => a.nivel === 'AVISO') ? 'AVISO' : 'OK';
   return { nivel, situacao: sit, data_emissao: emissao, data_validade: validade, alertas, extraido: { tipo_detectado: ex.tipo_detectado ?? null, titular: ex.titular ?? null, entidade: ex.entidade ?? null, curso: ex.curso ?? null, carga_horaria: ex.carga_horaria ?? null, resultado: ex.resultado ?? null } };
 }

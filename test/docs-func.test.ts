@@ -24,3 +24,14 @@ test('veredito', () => {
 });
 test('nome e bytes', () => { assert.ok(mesmoNome('JOSE A. SANTOS', 'José Antonio Santos')); assert.ok(!mesmoNome('Maria Souza', 'João da Silva'));
   assert.equal(mimePorBytes(Buffer.from('%PDF-1.7\n.........')), 'application/pdf'); assert.equal(mimePorBytes(Buffer.from('MZ..............')), null); });
+test('frente e verso', () => {
+  const sl = slotsNecessarios({ funcao: 'Motorista' }, []), rg = (docs: any[]) => montarChecklist(sl, docs, '2026-03-01').itens.find(i => i.tipo === 'RG')!;
+  assert.ok(rg([]).frente_verso && sl.find(s => s.tipo === 'CNH')!.frente_verso);
+  const f = { id: 'f', tipo: 'RG', lado: 'FRENTE', criado_em: '2026-01-01', status: 'ENVIADO' }, v = { id: 'v', tipo: 'RG', lado: 'VERSO', criado_em: '2026-01-02', status: 'ENVIADO' };
+  assert.equal(rg([f]).situacao, 'INCOMPLETO'); assert.equal(rg([f]).falta, 'verso'); assert.equal(rg([v]).falta, 'frente');
+  assert.equal(rg([f, v]).situacao, 'ENVIADO'); assert.equal(rg([{ ...f, lado: 'UNICO' }]).situacao, 'ENVIADO');
+  const c = montarChecklist(sl, [f], '2026-03-01').resumo; assert.equal(c.incompletos, 1); assert.equal(c.completos, 0);
+  const cnh = montarChecklist(sl, [{ id: 'a', tipo: 'CNH', lado: 'FRENTE', data_validade: '2020-01-01', criado_em: 'x', status: 'ENVIADO' }, { id: 'b', tipo: 'CNH', lado: 'VERSO', criado_em: 'y', status: 'ENVIADO' }], '2026-03-01').itens.find(i => i.tipo === 'CNH')!;
+  assert.equal(cnh.situacao, 'VENCIDO');
+  assert.ok(!veredito({ legivel: true }, { tipo: 'RG', nome_funcionario: 'A B', hoje: '2026-03-01', lado: 'VERSO' }).alertas.some(a => /titular|validade/.test(a.texto)));
+});
