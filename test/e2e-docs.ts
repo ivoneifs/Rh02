@@ -36,7 +36,7 @@ try {
   r = await A.r('PATCH', `/v1/docs/${did}`, { data_validade: '31/12/2099' }); assert.equal(r.s, 422);
   // arquivo e zip
   r = await A.r('GET', `/v1/docs/${did}`, undefined, true); assert.equal(r.s, 200); assert.equal(r.h.get('content-type'), 'application/pdf'); assert.equal(r.h.get('x-content-type-options'), 'nosniff'); assert.ok(r.buf.subarray(0, 5).toString() === '%PDF-');
-  r = await A.r('GET', `/v1/funcionarios/${fid}/docs.zip`, undefined, true); assert.equal(r.s, 200); assert.equal(r.buf.readUInt32LE(0), 0x04034b50); assert.ok(r.buf.includes(Buffer.from('aso.pdf')));
+  r = await A.r('GET', `/v1/funcionarios/${fid}/docs.zip`, undefined, true); assert.equal(r.s, 200); assert.equal(r.buf.readUInt32LE(0), 0x04034b50); assert.ok(r.buf.includes(Buffer.from('aso.pdf'))); require_zip(r.buf);
   // resumo
   r = await A.r('GET', `/v1/empresas/${emp}/docs-resumo`); assert.equal(r.s, 200); assert.equal(r.j[0].completos, 1);
   // isolamento
@@ -53,3 +53,5 @@ try {
   r = await A.r('DELETE', `/v1/docs/${did}`); assert.equal(r.s, 200);
   console.log('E2E docs OK');
 } finally { fake.close(); }
+function require_zip(b: Buffer) { // pasta única na raiz + subpasta por grupo
+  const nome = b.subarray(30, 30 + b.readUInt16LE(26)).toString('utf8'); assert.match(nome, /^João da Silva \(1\)\/Saúde ocupacional\/ASO periódico - \d{8} - aso\.pdf$/, nome); assert.ok(b.readUInt16LE(12) > 0, 'data DOS'); }

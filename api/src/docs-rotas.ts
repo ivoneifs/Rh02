@@ -104,13 +104,13 @@ export async function zipPasta(s: Sessao, funcId: string) {
   const { f, slots } = await contexto(s, funcId);
   const docs: any[] = await tx(s, async t => (await t.query('SELECT tipo, nome_arquivo, mime, dados, to_char(criado_em,\'YYYYMMDD\') AS dia FROM docs_func WHERE funcionario_id=$1 ORDER BY criado_em', [funcId])).rows);
   if (!docs.length) throw new ErroAuth(404, 'A pasta ainda não tem arquivos.');
-  const parts: Buffer[] = [], cen: Buffer[] = []; let off = 0; const usados = new Set<string>();
+  const raiz = String(f.nome ?? 'colaborador').replace(/[^\p{L}\p{N} ._-]/gu, '').trim().slice(0, 60) + (f.matricula ? ` (${String(f.matricula).replace(/[^\w-]/g, '')})` : ''); const hoje = new Date(), dt = (hoje.getUTCHours() << 11) | (hoje.getUTCMinutes() << 5) | (hoje.getUTCSeconds() >> 1), dd = ((hoje.getUTCFullYear() - 1980) << 9) | ((hoje.getUTCMonth() + 1) << 5) | hoje.getUTCDate(); const parts: Buffer[] = [], cen: Buffer[] = []; let off = 0; const usados = new Set<string>();
   for (const d of docs) {
-    const grupo = (slots.find(x => x.tipo === d.tipo)?.grupo ?? 'Outros documentos').replace(/[^\p{L}\p{N} ._-]/gu, '');
-    let nome = `${grupo}/${d.tipo.replace(/[^A-Z0-9_-]/gi, '_')}_${d.dia}_${String(d.nome_arquivo).replace(/[^\p{L}\p{N} ._-]/gu, '_')}`; while (usados.has(nome)) nome = nome.replace(/(\.[^.]*)?$/, '_2$1'); usados.add(nome);
+    const sl = slots.find(x => x.tipo === d.tipo), seg = (v: string) => v.replace(/[^\p{L}\p{N} ._()-]/gu, '_').replace(/\s+/g, ' ').trim().slice(0, 80);
+    let nome = `${raiz}/${seg(sl?.grupo ?? 'Outros documentos')}/${seg(sl?.nome ?? d.tipo)} - ${d.dia} - ${seg(String(d.nome_arquivo))}`; while (usados.has(nome)) nome = nome.replace(/(\.[^.]*)?$/, '_2$1'); usados.add(nome);
     const n = Buffer.from(nome, 'utf8'), data: Buffer = Buffer.from(d.dados), c = crc32(data) >>> 0;
-    const h = Buffer.alloc(30); h.writeUInt32LE(0x04034b50, 0); h.writeUInt16LE(20, 4); h.writeUInt16LE(0x0800, 6); h.writeUInt32LE(c, 14); h.writeUInt32LE(data.length, 18); h.writeUInt32LE(data.length, 22); h.writeUInt16LE(n.length, 26);
-    const e = Buffer.alloc(46); e.writeUInt32LE(0x02014b50, 0); e.writeUInt16LE(20, 4); e.writeUInt16LE(20, 6); e.writeUInt16LE(0x0800, 8); e.writeUInt32LE(c, 16); e.writeUInt32LE(data.length, 20); e.writeUInt32LE(data.length, 24); e.writeUInt16LE(n.length, 28); e.writeUInt32LE(off, 42);
+    const h = Buffer.alloc(30); h.writeUInt32LE(0x04034b50, 0); h.writeUInt16LE(20, 4); h.writeUInt16LE(0x0800, 6); h.writeUInt16LE(dt, 10); h.writeUInt16LE(dd, 12); h.writeUInt32LE(c, 14); h.writeUInt32LE(data.length, 18); h.writeUInt32LE(data.length, 22); h.writeUInt16LE(n.length, 26);
+    const e = Buffer.alloc(46); e.writeUInt32LE(0x02014b50, 0); e.writeUInt16LE(20, 4); e.writeUInt16LE(20, 6); e.writeUInt16LE(0x0800, 8); e.writeUInt16LE(dt, 12); e.writeUInt16LE(dd, 14); e.writeUInt32LE(c, 16); e.writeUInt32LE(data.length, 20); e.writeUInt32LE(data.length, 24); e.writeUInt16LE(n.length, 28); e.writeUInt32LE(off, 42);
     parts.push(h, n, data); cen.push(e, n); off += 30 + n.length + data.length;
   }
   const cd = Buffer.concat(cen), fim = Buffer.alloc(22); fim.writeUInt32LE(0x06054b50, 0); fim.writeUInt16LE(docs.length, 8); fim.writeUInt16LE(docs.length, 10); fim.writeUInt32LE(cd.length, 12); fim.writeUInt32LE(off, 16);
