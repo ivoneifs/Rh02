@@ -304,13 +304,22 @@ function pickerFunc(onSel){const se=el('select',{},...optsEmp('— empresa —')
 function abrirFerr(f){const C=$('fdC');if(f.tipo==='registro')return abrirRegistros(f);const form=el('div',{style:'display:grid;gap:8px'});const ins={};let sel=null,ult=null,emp='';
  for(const c of f.campos){ins[c.n]=inCampo(c);form.append(el('label',{},c.l,ins[c.n]))}
  const pk=pickerFunc((fn,e)=>{sel=fn;emp=e;if(!fn)return;for(const [k,src] of Object.entries(AUTO)){if(!src||!ins[k])continue;let v=fn[src];if(v==null||v==='')continue;ins[k].value=k==='deps'?v:(k==='adm'||k==='nasc')?d10(v):v}if(ins.doc&&ins.doc.type==='text')ins.doc.value=fn.cpf;if(ins.tipo&&0)0});
- const out=el('div',{});const bt=el('button',{textContent:'Calcular'}),bs=el('button',{className:'sec',textContent:'Salvar na ficha',disabled:true});
+ const out=el('div',{});const bt=el('button',{textContent:'Calcular'}),bs=el('button',{className:'sec',textContent:'Salvar como registro',disabled:true});
  bt.onclick=async()=>{try{const e={};for(const c of f.campos)e[c.n]=valCampo(c,ins[c.n]);const r=await call('POST','/v1/ferramentas/'+f.id,e);ult={e,r};bs.disabled=false;
   const t=el('table');t.append(...r.linhas.map(l=>{const tr=el('tr',{className:l.forte?'s':''});tr.append(td(l.r),td(FMT[l.f](l.v),'n'));tr.cells[1].style.whiteSpace='normal';return tr}));const bx=el('button',{className:'sec sm',textContent:'💡 Explicar o cálculo',style:'margin-top:8px'}),ex=el('div',{className:'mut',style:'white-space:pre-wrap;margin-top:6px'});
   bx.onclick=async()=>{bx.disabled=true;ex.textContent='Gerando explicação…';try{ex.textContent=(await call('POST','/v1/ferramentas/'+f.id+'/explicar',e)).explicacao}catch(x2){if(x2.status===401)return mostrarAuth();ex.className='msg';ex.textContent=x2.message}finally{bx.disabled=false}};
   out.replaceChildren(t,...(r.aviso?[el('p',{className:'mut',textContent:r.aviso})]:[]),bx,ex)}catch(x){if(x.status===401)return mostrarAuth();out.replaceChildren(el('p',{className:'msg',textContent:x.message}))}};
- bs.onclick=async()=>{try{if(!ult)return;if(!emp&&!sel)return out.append(el('p',{className:'msg',textContent:'Escolha a empresa (e, se quiser, o funcionário) para guardar o resultado.'}));
-  await call('POST','/v1/registros',{ferramenta:f.id,empresa_id:emp||undefined,funcionario_id:sel?.id,titulo:f.nome+(sel?' – '+sel.nome:''),data_evento:hoje(),dados:{entrada:ult.e,resultado:ult.r.linhas}});out.append(el('p',{className:'msg ok',textContent:'Resultado guardado no banco (ficha do funcionário / histórico da ferramenta).'}))}catch(x){out.append(el('p',{className:'msg',textContent:x.message}))}};
+ bs.onclick=()=>{if(!ult)return;if(!emp&&!sel)return out.append(el('p',{className:'msg',textContent:'Escolha a empresa (e, se quiser, o funcionário) para guardar o resultado.'}));
+  document.getElementById('svBox')?.remove();
+  // padrão conforme a ferramenta: se o resultado traz uma data (prazo, fim de estabilidade, vencimento…) vira pendência EM ABERTO com validade; senão, CONCLUÍDO
+  const dl=ult.r.linhas.find(l=>/^\d{4}-\d{2}-\d{2}$/.test(String(l.v)));
+  const st=el('select',{},...COLS.map(([v,t])=>el('option',{value:v,textContent:t})));st.value=dl?'ABERTO':'CONCLUIDO';
+  const dv=el('input',{type:'date',value:dl?String(dl.v):''}),ob=el('input',{placeholder:'Observação (opcional)',maxLength:300});
+  const forte=ult.r.linhas.find(l=>l.forte)||ult.r.linhas[0];const tit=f.nome+(sel?' – '+sel.nome:'')+(forte?' – '+forte.r+': '+(typeof forte.v==='number'?forte.v.toLocaleString('pt-BR'):forte.v):'');
+  const ok=el('button',{textContent:'Guardar no quadro Registros'});
+  ok.onclick=async()=>{ok.disabled=true;try{await call('POST','/v1/registros',{ferramenta:f.id,empresa_id:emp||undefined,funcionario_id:sel?.id,titulo:tit.slice(0,200),data_evento:hoje(),data_validade:dv.value||undefined,status:st.value,dados:{entrada:ult.e,resultado:ult.r.linhas,observacao:ob.value||undefined}});
+    box.replaceChildren(el('p',{className:'msg ok',textContent:'Guardado como registro "'+(COLS.find(c=>c[0]===st.value)||[])[1]+'". '}),el('button',{className:'sec sm',textContent:'Ver no quadro',onclick:()=>{$('fdlg').close();document.querySelector('nav button[data-t=reg]').click()}}))}catch(x){ok.disabled=false;box.append(el('p',{className:'msg',textContent:x.message}))}};
+  const box=el('div',{id:'svBox',className:'bar',style:'display:grid;gap:8px;margin-top:8px'},el('b',{textContent:'Guardar este resultado como registro'}),el('label',{},'Situação',st),el('label',{},dl?'Validade / prazo (detectado no resultado)':'Validade / lembrete (opcional)',dv),el('label',{},'Observação',ob),ok);out.append(box)};
  C.replaceChildren(el('h3',{textContent:f.nome,style:'margin:0'}),el('div',{className:'mut',textContent:f.desc}),pk.node,blocoSimulacao(f,ins),form,el('div',{className:'bar',style:'margin:0;border:0;padding:0'},bt,bs),out);
  el('div');$('fdlg').showModal();
  // histórico guardado desta ferramenta
@@ -347,9 +356,14 @@ function cartaoReg(r,ci,nm){const venc=r.status==='ABERTO'&&r.data_validade&&r.d
   const b=el('div',{className:'kb2'});
   if(ci>0)b.append(el('button',{className:'sec sm',title:'Mover para '+COLS[ci-1][1],textContent:'◀',onclick:()=>moverReg(r,COLS[ci-1][0])}));
   if(ci<2)b.append(el('button',{className:'sec sm',title:'Mover para '+COLS[ci+1][1],textContent:'▶',onclick:()=>moverReg(r,COLS[ci+1][0])}));
+  if(Array.isArray(r.dados?.resultado))b.append(el('button',{className:'sec sm',textContent:'Ver',onclick:()=>verReg(r,nm)}));
   b.append(el('button',{className:'sec sm',textContent:'Editar',onclick:()=>editarReg(r)}),el('button',{className:'dng sm',textContent:'Excluir',onclick:()=>{if(confirm('Excluir este registro?'))acao(async()=>{await call('DELETE','/v1/registros/'+r.id);await carregarReg()})}}));c.append(b)}
  return c}
 async function moverReg(r,st){try{msg('');await call('PATCH','/v1/registros/'+r.id,{status:st});r.status=st;pintarReg()}catch(e){err(e)}}
+function verReg(r,nm){const C=$('fdC'),t=el('table'),ent=r.dados.entrada||{};const F=FERR.find(x=>x.id===r.ferramenta);const rot=Object.fromEntries((F?.campos||[]).map(c=>[c.n,c.l]));
+ t.append(...Object.entries(ent).map(([k,v])=>{const tr=el('tr');tr.append(td(rot[k]||k),td(String(v)));return tr}));
+ const t2=el('table');t2.append(...r.dados.resultado.map(l=>{const tr=el('tr',{className:l.forte?'s':''});tr.append(td(l.r),td(typeof l.v==='number'?l.v.toLocaleString('pt-BR'):String(l.v),'n'));tr.cells[1].style.whiteSpace='normal';return tr}));
+ C.replaceChildren(el('h3',{textContent:nm[r.ferramenta]||r.ferramenta,style:'margin:0'}),el('div',{className:'mut',textContent:(r.titulo||'')+(r.dados.observacao?' · '+r.dados.observacao:'')}),el('b',{textContent:'Dados informados'}),t,el('b',{textContent:'Resultado'}),t2);$('fdlg').showModal()}
 function editarReg(r){const f=FERR.find(x=>x.id===r.ferramenta);
  if(f&&f.tipo==='registro')return formReg(f,r,carregarReg);
  formulario('Editar registro',[{n:'titulo',l:'Título',v:r.titulo||''},{n:'data_evento',l:'Data',tipo:'date',v:d10(r.data_evento)},{n:'data_validade',l:'Validade',tipo:'date',v:d10(r.data_validade)},{n:'status',l:'Situação',v:r.status,opcoes:COLS}],
