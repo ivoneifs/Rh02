@@ -16,6 +16,9 @@ import * as pessoal from './pessoal.ts';
 import * as registros from './registros.ts';
 import { catalogo, executar, TODAS } from './catalogo.ts';
 import { simular, explicar } from './simulacao.ts';
+import * as sugestao from './sugestao.ts';
+import { controle as controleSst } from './controle.ts';
+import { catalogo as modelos, redigir as redigirModelo, AVISO as AVISO_DOC } from './modelos-catalogo.ts';
 import * as dadosTeste from './dadostestes.ts';
 import { semaforo } from './semaforo.ts';
 import { analisarCandidato } from './selecao.ts';
@@ -71,12 +74,16 @@ const server = http.createServer(async (req, res) => {
 
     let m: RegExpExecArray | null;
     // Ferramentas de cálculo (qualquer papel logado) e Normas (leitura: todos; alteração: ADMIN)
-    if (p.startsWith('/v1/ferramentas') || p === '/v1/semaforo' || /^\/v1\/registros\/[^/]+\/analisar$/.test(p) || p.startsWith('/v1/normas') || p.startsWith('/v1/registros') || p.startsWith('/v1/funcionarios') || p.startsWith('/v1/cargos') || p.startsWith('/v1/ambientes') || /^\/v1\/empresas\/[^/]+\/(funcionarios|cargos|ambientes)$/.test(p)) {
+    if (p.startsWith('/v1/ferramentas') || p.startsWith('/v1/modelos') || p === '/v1/semaforo' || p === '/v1/sugestao/condicoes' || /^\/v1\/registros\/[^/]+\/analisar$/.test(p) || p.startsWith('/v1/normas') || p.startsWith('/v1/registros') || p.startsWith('/v1/funcionarios') || p.startsWith('/v1/cargos') || p.startsWith('/v1/ambientes') || /^\/v1\/empresas\/[^/]+\/(funcionarios|cargos|ambientes)$/.test(p)) {
       const s = await auth.sessaoDe(req); if (!s) return json(res, 401, { erro: 'não autenticado' });
       const corpo = async () => JSON.parse(await lerCorpo(req, 200_000));
       const qp = url.searchParams;
       if ((m = /^\/v1\/empresas\/([^/]+)\/funcionarios$/.exec(p))) { if (req.method === 'GET') return json(res, 200, await pessoal.listarFuncionarios(s, m[1], qp.get('q') ?? undefined, qp.get('ativos') === '1')); if (req.method === 'POST') return json(res, 201, await pessoal.criarFuncionario(s, m[1], await corpo())); }
+      if ((m = /^\/v1\/funcionarios\/([^/]+)\/controle-sst$/.exec(p)) && req.method === 'GET') return json(res, 200, await controleSst(s, m[1]));
       if ((m = /^\/v1\/funcionarios\/([^/]+)\/integracao$/.exec(p)) && req.method === 'GET') return json(res, 200, await integracao.checklist(s, m[1]));
+      if (p === '/v1/sugestao/condicoes' && req.method === 'GET') return json(res, 200, sugestao.CONDICOES);
+      if ((m = /^\/v1\/funcionarios\/([^/]+)\/integracao\/sugerir$/.exec(p)) && req.method === 'POST') return json(res, 200, await sugestao.sugerir(s, m[1], await corpo()));
+      if ((m = /^\/v1\/funcionarios\/([^/]+)\/integracao\/sugerir\/gerar$/.exec(p)) && req.method === 'POST') return json(res, 201, await sugestao.gerarDaSugestao(s, m[1], await corpo()));
       if ((m = /^\/v1\/funcionarios\/([^/]+)\/integracao\/gerar$/.exec(p)) && req.method === 'POST') return json(res, 201, await integracao.gerarPendencias(s, m[1], (await corpo())?.prazo_dias ?? 15));
       if ((m = /^\/v1\/funcionarios\/([^/]+)$/.exec(p))) { if (req.method === 'GET') return json(res, 200, await pessoal.obterFuncionario(s, m[1])); if (req.method === 'PATCH') return json(res, 200, await pessoal.editarFuncionario(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await pessoal.excluirFuncionario(s, m[1])); }
       for (const [rota, mod] of [['cargos', pessoal.cargos], ['ambientes', pessoal.ambientes]] as const) {
@@ -84,6 +91,8 @@ const server = http.createServer(async (req, res) => {
         if ((m = new RegExp(`^/v1/empresas/([^/]+)/${rota}$`).exec(p))) { if (req.method === 'GET') return json(res, 200, await mod.listar(s, m[1])); if (req.method === 'POST') return json(res, 201, await mod.criar(s, m[1], await corpo())); }
         if ((m = new RegExp(`^/v1/${rota}/([^/]+)$`).exec(p))) { if (req.method === 'PATCH') return json(res, 200, await mod.editar(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await mod.excluir(s, m[1])); }
       }
+      if (p === '/v1/modelos' && req.method === 'GET') return json(res, 200, { aviso: AVISO_DOC, modelos: modelos() });
+      if ((m = /^\/v1\/modelos\/([a-z0-9-]+)\/redigir$/.exec(p)) && req.method === 'POST') { const md = modelos().find(x => x.id === m![1]); if (!md) return json(res, 404, { erro: 'modelo desconhecido' }); return json(res, 200, await redigirModelo(s, md, await corpo())); }
       if (p === '/v1/semaforo' && req.method === 'GET') return json(res, 200, await semaforo(s, qp.get('empresa') ?? undefined));
       if ((m = /^\/v1\/registros\/([^/]+)\/analisar$/.exec(p)) && req.method === 'POST') return json(res, 200, await analisarCandidato(s, m[1]));
       if (p === '/v1/registros/vencimentos' && req.method === 'GET') return json(res, 200, await registros.vencimentos(s, Number(qp.get('dias') ?? 30) || 30, qp.get('empresa') ?? undefined));
