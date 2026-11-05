@@ -33,6 +33,33 @@ dialog.pq{width:min(420px,95vw)}
 #auth{max-width:380px;margin:8vh auto;padding:0 16px}#auth .card{display:grid;gap:10px;padding:20px}#auth h1{margin:0 0 4px;font-size:20px}
 #frmC.g{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}#frm.largo{max-width:960px;width:92vw}.venc{color:#b42318;font-weight:600}.tag{font-size:11px;border:1px solid var(--line);border-radius:10px;padding:0 6px;margin-left:6px}
 .tabs{display:flex;gap:6px;margin-bottom:12px}.hide{display:none!important}.mut{color:var(--mut)}a.lnk{color:var(--pri);cursor:pointer;text-decoration:underline}
+
+/* Legibilidade: fonte maior, mais espaçamento e contraste */
+:root{--mut:#4a5468}@media(prefers-color-scheme:dark){:root{--mut:#b4bdd6}}
+body{font:15.5px/1.6 "Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,system-ui,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+header b{font-size:17px;letter-spacing:.2px}header span{font-size:13.5px;opacity:.92}
+nav button{font-size:14.5px;padding:8px 13px;font-weight:500}nav button.on{font-weight:600}
+main{max-width:1240px}h2,h3,h4{line-height:1.3}h3{font-size:18px}
+label{font-size:13.5px;font-weight:500;gap:4px}input,select,button,textarea{font-size:15px;padding:8px 10px}textarea{font:inherit;line-height:1.5}
+button.sm{font-size:13.5px;padding:4px 10px}
+th,td{padding:9px 12px;font-size:14.5px}th{font-size:13.5px;font-weight:600}
+.tag{font-size:12.5px;padding:1px 8px}.sem .chip,.sem .chip b{font-size:13.5px}
+.kcard{font-size:14.5px}.kcard .kf{font-size:12.5px}.mut{font-size:14px}
+.msg{font-size:14.5px}summary{cursor:pointer;font-weight:600}
+li{margin:2px 0}code,pre{font-size:13.5px}
+/* Abas */
+nav{gap:6px}nav button{color:#e6ebff;font-size:15.5px;font-weight:600;letter-spacing:.2px;padding:9px 14px;border-bottom:3px solid transparent;border-radius:8px 8px 0 0}
+nav button:hover{background:rgba(255,255,255,.1)}nav button.on{background:rgba(255,255,255,.18);color:#fff;border-bottom-color:#fff}
+#fAreas button,#fSubs button,#dAreas button,#gAreas button,#gLetras button,.sem>button{font-size:15px;font-weight:600;padding:7px 13px;line-height:1.3}
+#fSubs button{font-size:14px}
+/* Filtros */
+.bar label{font-size:14px;font-weight:600;color:var(--fg)}
+.bar select,.bar input,.bar input[type=search]{font-size:15.5px;min-height:40px;padding:8px 11px;border:1.5px solid #9aa6c2;border-radius:8px}
+.bar select:focus,.bar input:focus{outline:2px solid var(--pri);border-color:var(--pri)}
+.bar input::placeholder{color:var(--mut);opacity:.9}
+.bar label:has(input[type=checkbox]){display:flex;align-items:center;gap:6px;font-size:14.5px}input[type=checkbox]{width:18px;height:18px}
+@media(prefers-color-scheme:dark){.bar select,.bar input{border-color:#4a5a8a}}
+@media(max-width:600px){body{font-size:16px}nav button{font-size:15px;padding:8px 10px}}
 </style></head><body>
 
 <!-- ============ Login / Cadastro ============ -->
@@ -60,7 +87,7 @@ dialog.pq{width:min(420px,95vw)}
 <div id="app" class="hide">
 <header><b>Sistema Gênesis ERP</b>
   <nav><button data-t="bal" class="on">Balancete</button><button data-t="fun">Funcionários</button><button data-t="fer">Ferramentas</button><button data-t="reg">Registros</button><button data-t="doc">Documentos</button><button data-t="pro">Profissionais</button><button data-t="glo">Glossário</button><button data-t="ia">Agente de IA</button><button data-t="adm" id="tAdm" class="hide">Administração</button></nav>
-  <div class="sp"></div><span id="quem"></span><button class="sec sm" id="bSenha" style="color:#fff;border-color:#fff">Alterar senha</button><button class="sec sm" id="bSair" style="color:#fff;border-color:#fff">Sair</button></header>
+  <div class="sp"></div><span id="quem"></span><button class="sec sm" id="bFmenos" title="Diminuir a letra" style="color:#fff;border-color:#fff">A−</button><button class="sec sm" id="bFmais" title="Aumentar a letra" style="color:#fff;border-color:#fff">A+</button><button class="sec sm" id="bSenha" style="color:#fff;border-color:#fff">Alterar senha</button><button class="sec sm" id="bSair" style="color:#fff;border-color:#fff">Sair</button></header>
 <main>
 <div class="msg" id="msg"></div>
 
@@ -157,6 +184,9 @@ let eu=null;
 
 /* ---------- login / cadastro ---------- */
 const am=(t)=>{$('aMsg').textContent=t||''};
+/* tamanho da letra (A−/A+), lembrado neste navegador */
+(function(){let z=1;try{z=parseFloat(localStorage.getItem('zoomLetra'))||1}catch(e){}const ap=()=>{document.body.style.zoom=z;try{localStorage.setItem('zoomLetra',z)}catch(e){}};ap();
+ document.getElementById('bFmais').onclick=()=>{z=Math.min(1.5,Math.round((z+.1)*10)/10);ap()};document.getElementById('bFmenos').onclick=()=>{z=Math.max(.8,Math.round((z-.1)*10)/10);ap()}})();
 function mostrarAuth(){eu=null;$('app').classList.add('hide');$('auth').classList.remove('hide');$('lSenha').value='';}
 $('aCad').onclick=()=>{$('fLogin').classList.add('hide');$('fCad').classList.remove('hide');am()};
 $('aLog').onclick=()=>{$('fCad').classList.add('hide');$('fLogin').classList.remove('hide');am()};
