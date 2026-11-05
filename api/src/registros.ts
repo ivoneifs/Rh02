@@ -2,6 +2,7 @@
 import { dbDoTenant, isUuid } from './db.ts';
 import { ErroAuth, type Sessao } from './auth.ts';
 import { TODAS as FERRAMENTAS } from './catalogo.ts';
+import { aplicarAoCadastro } from './cadastro-auto.ts';
 
 const dataOk = (s: unknown): s is string => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(s + 'T00:00:00Z').toISOString().slice(0, 10) === s;
 const tx = <R>(s: Sessao, fn: (t: any) => Promise<R>) => dbDoTenant(s.tenantId, s.papel).transaction(fn);
@@ -36,10 +37,13 @@ export const listar = (s: Sessao, f: Filtro) => tx(s, async t => (await t.query(
 export async function criar(s: Sessao, b: any) { w(s); const o = validar(b ?? {}, false);
   if (o.dados) { const d = JSON.parse(o.dados); d._por = s.nome; o.dados = JSON.stringify(d); } // quem criou (usuário logado)
   return tx(s, async t => { await vinculos(t, o); const ks = Object.keys(o);
-    return (await t.query(`INSERT INTO registros (tenant_id, criado_por${ks.map(k => ',' + k).join('')}) VALUES ($1,$2${ks.map((_, i) => `,$${i + 3}`).join('')}) RETURNING id`, [s.tenantId, s.usuarioId, ...ks.map(k => o[k])])).rows[0]; }); }
+    const r = (await t.query(`INSERT INTO registros (tenant_id, criado_por${ks.map(k => ',' + k).join('')}) VALUES ($1,$2${ks.map((_, i) => `,$${i + 3}`).join('')}) RETURNING id`, [s.tenantId, s.usuarioId, ...ks.map(k => o[k])])).rows[0];
+    return { ...r, cadastro_atualizado: await aplicarAoCadastro(t, { ferramenta: o.ferramenta, status: o.status ?? 'ABERTO', funcionario_id: o.funcionario_id ?? null, dados: o.dados ? JSON.parse(o.dados) : {}, data_evento: o.data_evento ?? null }) }; }); }
 export async function editar(s: Sessao, id: string, b: any) { w(s); chk(id); const o = validar(b ?? {}, true); delete o.ferramenta;
   return tx(s, async t => { await vinculos(t, o); if (o.dados) { const d = JSON.parse(o.dados), ant = (await t.query("SELECT dados->>'_por' AS por FROM registros WHERE id=$1", [id])).rows[0]?.por; if (ant) d._por = ant; d._editado_por = s.nome; o.dados = JSON.stringify(d); } const ks = Object.keys(o); if (!ks.length) return { ok: true };
-    if (!(await t.query(`UPDATE registros SET ${ks.map((k, i) => `${k}=$${i + 2}${k === 'dados' ? '::jsonb' : ''}`).join(',')}, atualizado_em=now() WHERE id=$1`, [id, ...ks.map(k => o[k])])).rowCount) throw new ErroAuth(404, 'Registro não encontrado.'); return { ok: true }; }); }
+    if (!(await t.query(`UPDATE registros SET ${ks.map((k, i) => `${k}=$${i + 2}${k === 'dados' ? '::jsonb' : ''}`).join(',')}, atualizado_em=now() WHERE id=$1`, [id, ...ks.map(k => o[k])])).rowCount) throw new ErroAuth(404, 'Registro não encontrado.');
+    const r = (await t.query("SELECT ferramenta, status, funcionario_id, dados, to_char(data_evento,'YYYY-MM-DD') AS data_evento FROM registros WHERE id=$1", [id])).rows[0];
+    return { ok: true, cadastro_atualizado: await aplicarAoCadastro(t, r) }; }); }
 export async function excluir(s: Sessao, id: string) { w(s); chk(id);
   return tx(s, async t => { if (!(await t.query('DELETE FROM registros WHERE id=$1', [id])).rowCount) throw new ErroAuth(404, 'Registro não encontrado.'); return { ok: true }; }); }
 /** Painel de vencimentos: itens ABERTOS vencidos ou que vencem nos próximos N dias, de todas as ferramentas. */

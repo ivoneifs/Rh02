@@ -91,7 +91,7 @@ dialog.pq{width:min(420px,95vw)}
 <div class="tw"><table id="pTab"></table></div>
 </section>
 <section id="p-reg" class="hide">
-<div class="bar" style="flex-wrap:wrap"><label>Empresa<select id="rgEmp"></select></label><label>Área<select id="rgArea"><option value="">Todas</option><option>DP e RH</option><option>SST</option><option>Fiscal e contábil</option></select></label><label>Ferramenta<select id="rgFer"></select></label><label>Buscar<input id="rgQ" placeholder="título, funcionário…"></label>
+<div class="bar" style="flex-wrap:wrap"><label>Empresa<select id="rgEmp"></select></label><label>Área<select id="rgArea"><option value="">Todas</option><option>DP e RH</option><option>SST</option><option>Fiscal e contábil</option><option>Jurídico</option></select></label><label>Ferramenta<select id="rgFer"></select></label><label>Buscar<input id="rgQ" placeholder="título, funcionário…"></label>
 <label style="display:flex;gap:4px;align-items:center"><input type="checkbox" id="rgVenc">Só vencidos / a vencer em 30 dias</label><button id="rgNovo">+ Novo registro</button></div>
 <p class="mut" id="rgInfo" style="margin:4px 0"></p>
 <div class="kb" id="kb"></div>
@@ -103,7 +103,7 @@ dialog.pq{width:min(420px,95vw)}
 </section>
 
 <section id="p-fun" class="hide">
-<div class="bar"><label>Empresa<select id="funEmp"></select></label><label>Buscar<input id="funQ" placeholder="nome, matrícula, CPF, função, setor" size="28"></label><label>Setor<select id="funSet"></select></label><label>DP<select id="funDp"><option value="">Todos</option><option value="VERMELHO">🔴 Vermelho</option><option value="AMARELO">🟡 Amarelo</option><option value="VERDE">🟢 Verde</option></select></label><label>SST<select id="funSst"><option value="">Todos</option><option value="VERMELHO">🔴 Vermelho</option><option value="AMARELO">🟡 Amarelo</option><option value="VERDE">🟢 Verde</option></select></label><label><input type="checkbox" id="funAt" checked> só ativos</label>
+<div class="bar"><label>Empresa<select id="funEmp"></select></label><button class="sec" id="funPasta">📁 Pasta da empresa</button><label>Buscar<input id="funQ" placeholder="nome, matrícula, CPF, função, setor" size="28"></label><label>Setor<select id="funSet"></select></label><label>DP<select id="funDp"><option value="">Todos</option><option value="VERMELHO">🔴 Vermelho</option><option value="AMARELO">🟡 Amarelo</option><option value="VERDE">🟢 Verde</option></select></label><label>SST<select id="funSst"><option value="">Todos</option><option value="VERMELHO">🔴 Vermelho</option><option value="AMARELO">🟡 Amarelo</option><option value="VERDE">🟢 Verde</option></select></label><label><input type="checkbox" id="funAt" checked> só ativos</label>
 <button id="funNovo">+ Novo funcionário</button><button class="sec" id="funCargos">Cargos</button><button class="sec" id="funAmb">Ambientes</button><button class="sec" id="funVenc">Vencimentos SST</button></div>
 <div class="sem" id="funSem"></div><p class="mut" id="funInfo" style="margin:4px 0"></p>
 <div class="tw"><table><thead><tr><th>Matrícula</th><th>Nome</th><th>CPF</th><th>Cargo</th><th>Função</th><th>Setor</th><th class="n">Idade</th><th>Admissão</th><th>Situação</th><th title="Departamento Pessoal / RH">DP</th><th title="Segurança do Trabalho">SST</th><th>Ações</th></tr></thead><tbody id="tFun"></tbody></table></div>
@@ -276,7 +276,7 @@ async function garantirFerr(){if(!FERR)FERR=await call('GET','/v1/ferramentas');
 /* funcionários */
 const SIT=[['','Não'],['1','Sim']];
 const CONTR=[['','—'],['CLT_INDETERMINADO','CLT prazo indeterminado'],['CLT_DETERMINADO','CLT prazo determinado'],['EXPERIENCIA','Experiência'],['APRENDIZ','Aprendiz'],['ESTAGIO','Estágio'],['TEMPORARIO','Temporário'],['INTERMITENTE','Intermitente'],['AUTONOMO','Autônomo'],['DIRIGENTE_SOCIO','Dirigente/sócio'],['OUTRO','Outro']];
-async function carregarFun(){try{await empresas();if(!$('funEmp').options.length){$('funEmp').replaceChildren(...optsEmp());$('funEmp').onchange=listarFun;$('funQ').oninput=listarFun;$('funAt').onchange=listarFun;for(const k of ['funSet','funDp','funSst'])$(k).onchange=pintarFun}await listarFun()}catch(e){err(e)}}
+async function carregarFun(){try{await empresas();if(!$('funEmp').options.length){$('funEmp').replaceChildren(...optsEmp());$('funEmp').onchange=listarFun;$('funPasta').onclick=()=>pastaEmpresa($('funEmp').value);$('funQ').oninput=listarFun;$('funAt').onchange=listarFun;for(const k of ['funSet','funDp','funSst'])$(k).onchange=pintarFun}await listarFun()}catch(e){err(e)}}
 let FUNS=[],SEM=null;
 const dot=(n,m)=>el('span',{className:'dot '+n,title:m&&m.length?m.join('\n'):(n==='VERDE'?'Em dia':n==='CINZA'?'Desligado/inativo':'')});
 async function listarFun(){const emp=$('funEmp').value;if(!emp){$('tFun').replaceChildren();$('funInfo').textContent='Cadastre uma empresa em Administração › Empresas.';return}
@@ -285,7 +285,7 @@ async function listarFun(){const emp=$('funEmp').value;if(!emp){$('tFun').replac
 function pintarFun(){const S=SEM?.itens||{};let l=FUNS.filter(f=>(!$('funSet').value||f.setor===$('funSet').value)&&(!$('funDp').value||S[f.id]?.dp.nivel===$('funDp').value)&&(!$('funSst').value||S[f.id]?.sst.nivel===$('funSst').value));
  $('funInfo').textContent=l.length+' de '+FUNS.length+' funcionário(s)';
  const R=SEM?.resumo;if(R){const chip=(nome,k,sel)=>{const c=el('div',{className:'chip'},el('b',{textContent:nome}));for(const n of ['VERMELHO','AMARELO','VERDE']){c.append(dot(n),el('button',{className:'sec sm',textContent:String(R[k][n]),title:'Filtrar '+nome+' '+n.toLowerCase(),onclick:()=>{$(sel).value=$(sel).value===n?'':n;pintarFun()}}))}return c};$('funSem').replaceChildren(chip('DP / RH','dp','funDp'),chip('SST','sst','funSst'),el('span',{className:'mut',style:'align-self:center;font-size:12px',textContent:'Passe o mouse no ponto para ver o motivo. Regras do sistema (conferir): cadastro, experiência, férias, ASO e pendências com prazo.'}))}
- $('tFun').replaceChildren(...l.map(f=>{const sm=S[f.id];const tr=el('tr',{className:f.ativo&&!f.data_demissao?'':'off'});const ac=el('td');ac.append(el('button',{className:'sec sm',textContent:'Ficha',onclick:()=>ficha(f.id)}),' ',el('button',{className:'sec sm',textContent:'Integração',title:'Checklist de treinamentos da integração, conforme a função',onclick:()=>integracaoUI(f.id)}),' ',el('button',{className:'sec sm',textContent:'Editar',onclick:()=>formFunc(f)}));
+ $('tFun').replaceChildren(...l.map(f=>{const sm=S[f.id];const tr=el('tr',{className:f.ativo&&!f.data_demissao?'':'off'});const ac=el('td');ac.append(el('button',{className:'sm',textContent:'Prontuário',onclick:()=>prontuario(f.id)}),' ',el('button',{className:'sec sm',textContent:'Ficha',onclick:()=>ficha(f.id)}),' ',el('button',{className:'sec sm',textContent:'Integração',title:'Checklist de treinamentos da integração, conforme a função',onclick:()=>integracaoUI(f.id)}),' ',el('button',{className:'sec sm',textContent:'Editar',onclick:()=>formFunc(f)}));
   const cd=x=>{const c=el('td',{style:'text-align:center'});if(sm)c.append(dot(sm[x].nivel,sm[x].motivos));return c};
   tr.append(td(f.matricula),td(f.nome),td(f.cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/,'$1.$2.$3-$4')),td(f.cargo_nome||'—'),td(f.funcao||'—'),td(f.setor||'—'),td(f.idade??'—','n'),td(dbr(f.data_admissao)),td(f.data_demissao?'Demitido '+dbr(f.data_demissao):(f.ativo?'Ativo':'Inativo')),cd('dp'),cd('sst'),ac);return tr}))}
 async function formFunc(f){const emp=f?f.empresa_id:$('funEmp').value;const [cg,am]=await Promise.all([call('GET',`/v1/empresas/${emp}/cargos`),call('GET',`/v1/empresas/${emp}/ambientes`)]);
@@ -341,6 +341,45 @@ function blocoFotos(tipo,id){const box=el('div',{style:'margin:10px 0'}),grade=e
  box.append(el('b',{textContent:'Fotos e anexos'}),el('div',{className:'mut',style:'font-size:12px',textContent:'As imagens são reduzidas antes do envio (JPEG, até 1280 px). Evite fotos que mostrem documentos pessoais sem necessidade (LGPD).'}),grade,el('div',{},bt,inp),aviso);pintar();return box}
 
 let _MEUPRO;const meuProfissional=async(f)=>{try{if(_MEUPRO===undefined||f){const l=await call('GET','/v1/registros?ferramenta=profissional');_MEUPRO=l.find(r=>r.status!=='CANCELADO'&&String(r.dados?.email||'').trim().toLowerCase()===String(eu?.email||'').trim().toLowerCase())||null}return _MEUPRO}catch{return null}};
+
+/* prontuário unificado do colaborador: tudo de SST, DP, fiscal/contábil e jurídico no mesmo lugar */
+async function prontuario(id){try{msg('');await empresas();await garantirFerr();const f=await call('GET','/v1/funcionarios/'+id);const nm=Object.fromEntries(FERR.map(x=>[x.id,x]));let ar='',tx='',regs=[];
+ const lista=el('div',{className:'tw',style:'max-height:46vh'}),chips=el('div',{className:'sem'}),cab=el('div',{className:'sem'});
+ const AREAS_P=['SST','DP e RH','Fiscal e contábil','Jurídico'],areaR=r=>areaDe(nm[r.ferramenta]?.cat||'')||'Outros';
+ const pintar=()=>{const q=gNorm(tx),base=regs.filter(r=>!q||gNorm((r.titulo||'')+' '+(nm[r.ferramenta]?.nome||'')).includes(q));
+  chips.replaceChildren(el('button',{className:ar?'sec sm':'sm',textContent:'Tudo ('+base.length+')',onclick:()=>{ar='';pintar()}}),...AREAS_P.map(a=>el('button',{className:'sm',style:ar===a?'background:'+ACOR[a]+';color:#fff;border:2px solid '+ACOR[a]+';font-weight:700':'background:#fff;color:'+ACOR[a]+';border:2px solid '+ACOR[a],textContent:a+' ('+base.filter(r=>areaR(r)===a).length+')',onclick:()=>{ar=a;pintar()}})));
+  const l=base.filter(r=>!ar||areaR(r)===ar).sort((a,b)=>String(b.data_evento||b.criado_em).localeCompare(String(a.data_evento||a.criado_em)));
+  const t=el('table');t.append(el('tr',{},...['Data','Área','Ferramenta','Título','Validade','Situação','Por',''].map(x=>el('th',{textContent:x}))),...(l.length?l.map(r=>{const a=areaR(r),tr=el('tr',{className:r.vencido?'venc':''}),F=nm[r.ferramenta];const ac=el('td');if(F&&F.tipo==='registro')ac.append(el('button',{className:'sec sm',textContent:'Abrir',onclick:()=>formReg(F,r,carregarPront,undefined,{empresa_id:f.empresa_id,funcionario_id:id})}));
+   tr.append(td(dbr(r.data_evento)),td(a),td(F?.nome||r.ferramenta),td(r.titulo||''),td(dbr(r.data_validade)),td(r.status),td(r.dados?._por||''),ac);tr.cells[1].style.cssText='color:'+ACOR[a]+';font-weight:600';tr.cells[2].style.whiteSpace='normal';tr.cells[3].style.whiteSpace='normal';return tr}):[el('tr',{},el('td',{colSpan:8,className:'mut',textContent:'Nada registrado ainda para este colaborador.'}))]));lista.replaceChildren(t)};
+ async function carregarPront(){regs=await call('GET','/v1/registros?funcionario='+id);pintar()}
+ // novo registro direto no prontuário: escolhe a área e a ferramenta (o colaborador já vem fixo)
+ const aN=el('select',{},...AREAS_P.map(a=>el('option',{value:a,textContent:a}))),fN=el('select',{});
+ const fillF=()=>fN.replaceChildren(...FERR.filter(x=>x.tipo==='registro'&&areaDe(x.cat)===aN.value).sort((a,b)=>a.cat.localeCompare(b.cat,'pt-BR')||a.nome.localeCompare(b.nome,'pt-BR')).map(x=>el('option',{value:x.id,textContent:subDe(x.cat)+' › '+x.nome})));aN.onchange=fillF;fillF();
+ const nv=el('button',{textContent:'+ Registrar neste prontuário',disabled:!podeEditar(),onclick:()=>{const F=nm[fN.value];if(F)formReg(F,null,carregarPront,undefined,{empresa_id:f.empresa_id,funcionario_id:id})}});
+ const bq=el('input',{placeholder:'Buscar no prontuário',size:24});bq.oninput=()=>{tx=bq.value;pintar()};
+ const sm=(await call('GET','/v1/semaforo?empresa='+f.empresa_id)).itens[f.id];
+ $('fdC').replaceChildren(el('h3',{textContent:'Prontuário unificado – '+f.nome,style:'margin:0'}),el('div',{className:'mut',textContent:[f.matricula,f.cargo_nome,f.funcao,f.setor].filter(Boolean).join(' · ')}),
+  sm?el('div',{className:'ia'},...['dp','sst'].map(k=>el('div',{},dot(sm[k].nivel),' ',el('b',{textContent:k==='dp'?'DP / RH: ':'SST: '}),sm[k].motivos.length?sm[k].motivos.join(' · '):'em dia'))):el('span'),
+  el('div',{className:'mut',style:'font-size:12px;margin:6px 0',textContent:'Tudo o que for salvo em qualquer ferramenta para este colaborador (SST, DP, fiscal/contábil, jurídico) aparece aqui e é atualizado automaticamente, sem abrir cada ferramenta separadamente.'}),
+  el('div',{className:'bar',style:'margin:0 0 8px;align-items:end'},el('label',{},'Área',aN),el('label',{},'Ferramenta',fN),nv,el('label',{},'Buscar',bq)),chips,lista,blocoFotos('funcionario',id));
+ $('fdlg').showModal();await carregarPront()}catch(e){if(e.status===401)return mostrarAuth();err(e)}}
+
+/* pasta da empresa: contábil, jurídico, SST e DP da empresa (e de seus colaboradores) no mesmo lugar */
+async function pastaEmpresa(emp){try{msg('');await empresas();await garantirFerr();if(!emp)return msg('Selecione uma empresa.');const E=(EMPS||[]).find(x=>x.id===emp)||{},nm=Object.fromEntries(FERR.map(x=>[x.id,x]));let ar='',tx='',regs=[];
+ const AREAS_P=['Fiscal e contábil','Jurídico','SST','DP e RH'],areaR=r=>areaDe(nm[r.ferramenta]?.cat||'')||'Outros',lista=el('div',{className:'tw',style:'max-height:46vh'}),chips=el('div',{className:'sem'});
+ const pintar=()=>{const q=gNorm(tx),base=regs.filter(r=>!q||gNorm((r.titulo||'')+' '+(nm[r.ferramenta]?.nome||'')+' '+(r.funcionario_nome||'')).includes(q));
+  chips.replaceChildren(el('button',{className:ar?'sec sm':'sm',textContent:'Tudo ('+base.length+')',onclick:()=>{ar='';pintar()}}),...AREAS_P.map(a=>el('button',{className:'sm',style:ar===a?'background:'+ACOR[a]+';color:#fff;border:2px solid '+ACOR[a]+';font-weight:700':'background:#fff;color:'+ACOR[a]+';border:2px solid '+ACOR[a],textContent:a+' ('+base.filter(r=>areaR(r)===a).length+')',onclick:()=>{ar=a;pintar()}})));
+  const l=base.filter(r=>!ar||areaR(r)===ar).sort((a,b)=>String(b.data_evento||b.criado_em).localeCompare(String(a.data_evento||a.criado_em)));
+  const t=el('table');t.append(el('tr',{},...['Data','Área','Ferramenta','Título','Colaborador','Validade','Situação','Por',''].map(x=>el('th',{textContent:x}))),...(l.length?l.map(r=>{const a=areaR(r),F=nm[r.ferramenta],tr=el('tr',{className:r.vencido?'venc':''}),ac=el('td');if(F&&F.tipo==='registro')ac.append(el('button',{className:'sec sm',textContent:'Abrir',onclick:()=>formReg(F,r,carregar,undefined,{empresa_id:emp,funcionario_id:r.funcionario_id||''})}));
+   tr.append(td(dbr(r.data_evento)),td(a),td(F?.nome||r.ferramenta),td(r.titulo||''),td(r.funcionario_nome||'—'),td(dbr(r.data_validade)),td(r.status),td(r.dados?._por||''),ac);tr.cells[1].style.cssText='color:'+ACOR[a]+';font-weight:600';tr.cells[2].style.whiteSpace='normal';tr.cells[3].style.whiteSpace='normal';return tr}):[el('tr',{},el('td',{colSpan:9,className:'mut',textContent:'Nada registrado ainda para esta empresa.'}))]));lista.replaceChildren(t)};
+ async function carregar(){regs=await call('GET','/v1/registros?empresa='+emp);pintar()}
+ const aN=el('select',{},...AREAS_P.map(a=>el('option',{value:a,textContent:a}))),fN=el('select',{});
+ const fillF=()=>fN.replaceChildren(...FERR.filter(x=>x.tipo==='registro'&&areaDe(x.cat)===aN.value).sort((a,b)=>a.cat.localeCompare(b.cat,'pt-BR')||a.nome.localeCompare(b.nome,'pt-BR')).map(x=>el('option',{value:x.id,textContent:subDe(x.cat)+' › '+x.nome})));aN.onchange=fillF;fillF();
+ const nv=el('button',{textContent:'+ Registrar na pasta da empresa',disabled:!podeEditar(),onclick:()=>{const F=nm[fN.value];if(F)formReg(F,null,carregar,undefined,{empresa_id:emp,funcionario_id:''})}});
+ const bq=el('input',{placeholder:'Buscar na pasta',size:24});bq.oninput=()=>{tx=bq.value;pintar()};
+ $('fdC').replaceChildren(el('h3',{textContent:'Pasta da empresa – '+(E.razao_social||''),style:'margin:0'}),el('div',{className:'mut',style:'font-size:12px;margin:6px 0',textContent:'Contábil, fiscal, jurídico, SST e DP da empresa e dos colaboradores em um só lugar. Para registros de um colaborador, use o botão "Prontuário" na aba Funcionários.'}),
+  el('div',{className:'bar',style:'margin:0 0 8px;align-items:end'},el('label',{},'Área',aN),el('label',{},'Ferramenta',fN),nv,el('label',{},'Buscar',bq)),chips,lista,blocoFotos('empresa',emp));
+ $('fdlg').showModal();await carregar()}catch(e){if(e.status===401)return mostrarAuth();err(e)}}
 /* profissionais responsáveis */
 let PROS=[],PRO_F=null;
 const PRO_PROF={tecnico_st:'Técnico em segurança do trabalho',eng_st:'Engenheiro de segurança do trabalho',medico_trab:'Médico do trabalho',enfermeiro_trab:'Enfermeiro do trabalho',analista_rh:'Analista de RH / DP',psicologo:'Psicólogo',assistente_social:'Assistente social',fisio:'Fisioterapeuta',contador:'Contador',tec_contabil:'Técnico em contabilidade',advogado:'Advogado',higienista:'Higienista ocupacional',outro:'Outro'};
@@ -399,18 +438,18 @@ function abrirDoc(m){const C=$('dC'),cor=DCOR[m.area];$('dTit').textContent=m.no
  pintar();$('ddlg').showModal()}
 /* ferramentas */
 const FMT={brl:v=>'R$ '+money(v),pct:v=>(Number(v)*100).toLocaleString('pt-BR',{maximumFractionDigits:2})+'%',num:v=>Number(v).toLocaleString('pt-BR',{maximumFractionDigits:4}),txt:v=>String(v)};
-const areaDe=c=>/^SST/.test(c)?'SST':(/^(DP|RH)/.test(c)||['Folha e DP','Rescisão e férias'].includes(c))?'DP e RH':/^Fiscal/.test(c)?'Fiscal e contábil':'Outros';
-const subDe=c=>c.replace(/^(SST|DP|RH|Fiscal) · /,'');
-let FAREA='';const ACOR={SST:'#dc2626','DP e RH':'#2563eb','Fiscal e contábil':'#16a34a',Outros:'#6b7280'};
+const areaDe=c=>/^SST/.test(c)?'SST':(/^(DP|RH)/.test(c)||['Folha e DP','Rescisão e férias'].includes(c))?'DP e RH':/^Fiscal/.test(c)?'Fiscal e contábil':/^Jur/.test(c)?'Jurídico':'Outros';
+const subDe=c=>c.replace(/^(SST|DP|RH|Fiscal|Jurídico) · /,'');
+let FAREA='';const ACOR={SST:'#dc2626','DP e RH':'#2563eb','Fiscal e contábil':'#16a34a','Jurídico':'#7c3aed',Outros:'#6b7280'};
 async function carregarFerr(){try{await empresas(true);await garantirFerr();if(!$('fCat').dataset.ok){$('fCat').dataset.ok='1';$('fBusca').oninput=$('fCat').onchange=$('fTipo').onchange=$('fOrd').onchange=listarFerr;$('fLimpar').onclick=()=>{FAREA='';$('fBusca').value='';$('fTipo').value='';$('fCat').value='';$('fOrd').value='sub';listarFerr()}}listarFerr()}catch(e){err(e)}}
 function listarFerr(){const q=$('fBusca').value.toLowerCase(),tp=$('fTipo').value,tipoDe=f=>f.tipo==='registro'?'registro':'calc';
  // áreas (SST, DP e RH, ...) com contagem; o subgrupo só lista os grupos da área escolhida
- const areas=['DP e RH','SST','Fiscal e contábil','Outros'].filter(a=>FERR.some(f=>areaDe(f.cat)===a));
+ const areas=['DP e RH','SST','Fiscal e contábil','Jurídico','Outros'].filter(a=>FERR.some(f=>areaDe(f.cat)===a));
  const base=FERR.filter(f=>(!tp||tipoDe(f)===tp)&&(!q||(f.nome+' '+f.desc+' '+f.cat).toLowerCase().includes(q)));
  $('fAreas').replaceChildren(el('button',{className:FAREA?'sec sm':'sm',textContent:'Todas ('+base.length+')',onclick:()=>{FAREA='';$('fCat').value='';listarFerr()}}),...areas.map(a=>el('button',{className:'sm',style:FAREA===a?'background:'+ACOR[a]+';color:#fff;border:2px solid '+ACOR[a]+';font-weight:700':'background:#fff;color:'+ACOR[a]+';border:2px solid '+ACOR[a],textContent:a+' ('+base.filter(f=>areaDe(f.cat)===a).length+')',onclick:()=>{FAREA=a;$('fCat').value='';listarFerr()}})));
  const grupos=[...new Set(FERR.filter(f=>!FAREA||areaDe(f.cat)===FAREA).map(f=>f.cat))],cur=$('fCat').value;
  $('fCat').replaceChildren(el('option',{value:'',textContent:FAREA?'Todos de '+FAREA:'Todos os subgrupos'}),...grupos.map(g=>el('option',{value:g,textContent:subDe(g)+' ('+base.filter(f=>f.cat===g).length+')'})));$('fCat').value=grupos.includes(cur)?cur:'';
- const ORD_AREA=['DP e RH','SST','Fiscal e contábil','Outros'];
+ const ORD_AREA=['DP e RH','SST','Fiscal e contábil','Jurídico','Outros'];
  const subs=[...new Set(FERR.filter(f=>!FAREA||areaDe(f.cat)===FAREA).map(f=>f.cat))].sort((a,b)=>ORD_AREA.indexOf(areaDe(a))-ORD_AREA.indexOf(areaDe(b))||subDe(a).localeCompare(subDe(b),'pt-BR'));
  $('fSubs').replaceChildren(...subs.map(g=>{const n=base.filter(f=>f.cat===g).length,cor=ACOR[areaDe(g)],on=$('fCat').value===g;return el('button',{className:'sm',disabled:!n&&!on,style:(on?'background:'+cor+';color:#fff;':'background:'+cor+'14;color:'+cor+';')+'border:1px solid '+cor+';border-radius:999px;padding:3px 10px;font-size:12px;'+(n||on?'':'opacity:.4'),textContent:(FAREA?'':areaDe(g)+' · ')+subDe(g)+' ('+n+')',onclick:()=>{$('fCat').value=on?'':g;listarFerr()}})}));
  const c=$('fCat').value;const l=base.filter(f=>(!FAREA||areaDe(f.cat)===FAREA)&&(!c||f.cat===c));
@@ -539,10 +578,10 @@ async function abrirRegistros(f){const C=$('fdC'),R=f.registro||{};const fe=el('
    const res=Object.entries(r.dados||{}).filter(([k,v])=>v!==''&&v!==false&&v!=null&&typeof v!=='object').slice(0,3).map(([k,v])=>v===true?k:String(v)).join(' · ');
    tr.append(td(r.funcionario_nome?`${r.funcionario_matricula} · ${r.funcionario_nome}`:'—'),td(r.titulo||''),td(dbr(r.data_evento)),td(dbr(r.data_validade)),td(r.status),(()=>{const c=td(res.slice(0,80));if(r.dados?.indicador_ia)c.prepend(dot(r.dados.indicador_ia,['Indicador da IA (apoio à decisão)']),' ');return c})(),ac);tr.cells[5].style.whiteSpace='normal';return tr}))}catch(e){err(e)}}
  fe.onchange=fs.onchange=lista;C.replaceChildren(el('h3',{textContent:f.nome,style:'margin:0'}),el('div',{className:'mut',textContent:f.desc}),el('div',{className:'bar',style:'margin:0'},el('label',{},'Empresa',fe),el('label',{},'Situação',fs),bn),el('div',{className:'tw',style:'max-height:50vh'},tb));$('fdlg').showModal();lista()}
-async function formReg(f,r,aposSalvar,prefill){const R=f.registro||{};await empresas();const d=r?.dados||prefill||{};const meu=await meuProfissional();const ins={};const nodes=[];
+async function formReg(f,r,aposSalvar,prefill,preset){const R=f.registro||{};await empresas();const d=r?.dados||prefill||{};const meu=await meuProfissional();const ins={};const nodes=[];
  const se=el('select',{},...optsEmp(R.empresa||R.func?'— empresa —':'—')),sf=el('select',{},el('option',{value:'',textContent:'— funcionário —'}));
  const carregaF=async(sel)=>{const l=await funcs(se.value);sf.replaceChildren(el('option',{value:'',textContent:'— funcionário —'}),...l.map(x=>el('option',{value:x.id,textContent:`${x.matricula} · ${x.nome}`})));if(sel)sf.value=sel};
- se.value=r?.empresa_id||'';se.onchange=()=>carregaF();if(r?.empresa_id)await carregaF(r.funcionario_id);
+ se.value=r?.empresa_id||preset?.empresa_id||'';se.onchange=()=>carregaF();if(r?.empresa_id||preset?.empresa_id)await carregaF(r?.funcionario_id||preset?.funcionario_id);if(preset){se.disabled=true;sf.disabled=!!preset.funcionario_id}
  nodes.push(el('label',{},'Empresa',se));if(R.func)nodes.push(el('label',{},'Funcionário',sf));
  const ti=el('input',{value:r?.titulo||''}),de=el('input',{type:'date',value:d10(r?.data_evento)||hoje()}),dv=el('input',{type:'date',value:d10(r?.data_validade)}),st=el('select',{},...[['ABERTO','Aberto'],['CONCLUIDO','Concluído'],['CANCELADO','Cancelado']].map(([v,t])=>el('option',{value:v,textContent:t})));st.value=r?.status||'ABERTO';
  nodes.push(el('label',{},'Título / referência',ti),el('label',{},R.data||'Data',de));if(R.validade)nodes.push(el('label',{},R.validade,dv));nodes.push(el('label',{},'Situação',st));
@@ -552,7 +591,7 @@ async function formReg(f,r,aposSalvar,prefill){const R=f.registro||{};await empr
  abrirForm((r?'Editar – ':'Novo – ')+f.nome,nodes,async()=>{const dados={};for(const c of f.campos)dados[c.n]=valCampo(c,ins[c.n]);
   const b={ferramenta:f.id,empresa_id:se.value||null,funcionario_id:R.func?(sf.value||null):null,titulo:ti.value||null,data_evento:de.value||null,data_validade:dv.value||null,status:st.value,dados};
   if(f.id!=='profissional'&&!b.empresa_id&&!b.funcionario_id)throw new Error('Escolha a empresa'+(R.func?' e o funcionário.':'.'));
-  if(r)await call('PATCH','/v1/registros/'+r.id,b);else await call('POST','/v1/registros',b);await aposSalvar()},f.campos.length>6)}
+  const rs=r?await call('PATCH','/v1/registros/'+r.id,b):await call('POST','/v1/registros',b);if(rs&&rs.cadastro_atualizado&&rs.cadastro_atualizado.length)msg('Cadastro do funcionário atualizado automaticamente: '+rs.cadastro_atualizado.join(', ')+'.',true);await aposSalvar()},f.campos.length>6)}
 $('fdX').onclick=()=>$('fdlg').close();
 
 /* ---------- normas e tabelas (ADMIN edita) ---------- */
