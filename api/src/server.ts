@@ -20,6 +20,7 @@ import * as sugestao from './sugestao.ts';
 import { TERMOS } from './glossario.ts';
 import * as anexos from './anexos.ts';
 import { controle as controleSst } from './controle.ts';
+import { exemploDoModelo } from './exemplos.ts';
 import { catalogo as modelos, redigir as redigirModelo, AVISO as AVISO_DOC } from './modelos-catalogo.ts';
 import * as dadosTeste from './dadostestes.ts';
 import { semaforo } from './semaforo.ts';
@@ -47,6 +48,7 @@ const autorizado = (req: http.IncomingMessage) => {
 };
 const dataOk = (s: unknown): s is string => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 
+let EXEMPLOS: Record<string, Record<string, string>> | undefined;
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? '/', 'http://x'); const p = url.pathname;
@@ -101,6 +103,7 @@ const server = http.createServer(async (req, res) => {
         if (req.method === 'DELETE') return json(res, 200, await anexos.excluir(s, m[1]));
       }
       if (p === '/v1/glossario' && req.method === 'GET') return json(res, 200, TERMOS);
+      if (p === '/v1/modelos/exemplos' && req.method === 'GET') { EXEMPLOS ??= Object.fromEntries(modelos().map(x => [x.id, exemploDoModelo(x)])); return json(res, 200, { itens: EXEMPLOS }); }
       if (p === '/v1/modelos' && req.method === 'GET') return json(res, 200, { aviso: AVISO_DOC, modelos: modelos() });
       if ((m = /^\/v1\/modelos\/([a-z0-9-]+)\/redigir$/.exec(p)) && req.method === 'POST') { const md = modelos().find(x => x.id === m![1]); if (!md) return json(res, 404, { erro: 'modelo desconhecido' }); return json(res, 200, await redigirModelo(s, md, await corpo())); }
       if (p === '/v1/semaforo' && req.method === 'GET') return json(res, 200, await semaforo(s, qp.get('empresa') ?? undefined));

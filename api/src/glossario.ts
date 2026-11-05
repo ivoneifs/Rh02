@@ -193,6 +193,11 @@ Registro|Sistema|Item guardado no banco, como um ASO, treinamento, ficha de EPI 
 Quadro de Registros|Sistema|Aba em formato kanban com colunas Em aberto, Concluído e Cancelado. Mostra o que há para fazer e permite criar, editar, mover e excluir registros.
 Kanban|Sistema|Quadro visual em colunas que representam a situação do trabalho; os cartões se movem conforme avançam.
 Ferramenta|Sistema|Calculadora ou formulário do sistema (mais de 230). Tipo "cálculo" mostra resultado; tipo "registro" guarda o dado no banco.
+Agenda|Sistema|Aba com calendário mensal que reúne seus compromissos (azul) e os vencimentos dos registros (ASO, treinamentos, prazos, contratos etc.). Clique em um dia para ver os itens e criar um compromisso.
+Alarme / lembrete|Sistema|Aviso na tela, com som (e notificação do navegador, se você permitir), que aparece antes da hora do compromisso, conforme o campo "Avisar antes". Funciona enquanto o sistema estiver aberto no navegador; é possível dispensar ou adiar 10 minutos.
+Calculadora|Sistema|Botão 🧮 no topo: calculadora com percentuais (ex.: 200+10% = 220), histórico e atalhos para % de um valor, acréscimo, desconto, valor da hora e regra de três.
+Compromisso|Sistema|Registro da agenda com título, data, hora, tipo, local e antecedência do alarme. Pode ser concluído, reaberto ou editado a qualquer momento.
+Modelos preenchidos|Sistema|Aba de consulta com todos os modelos de documentos já preenchidos com dados fictícios, para você ver como o documento fica quando bem preenchido. Não são documentos reais.
 Completar com IA|Sistema|Botão em cada ferramenta: você preenche uma parte e a IA, como superusuário, completa o restante de acordo com o que você informou (destacado em roxo), sem sobrescrever seus dados e listando o que conferir. Se nada for preenchido, gera um exemplo fictício para aprender. Nada é gravado até você salvar.
 Explicar o cálculo|Sistema|Botão que a IA usa para descrever, passo a passo, como o resultado foi obtido.
 Documentos|Sistema|Aba com mais de 200 modelos de laudos, relatórios, contratos, declarações e comunicados, preenchidos com dados da empresa e do colaborador, com impressão em PDF.
