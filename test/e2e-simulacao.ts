@@ -22,7 +22,10 @@ try {
   r = await A.r('PUT', '/v1/ia/config', { apiKey: 'sk-TesteAbCdEf1234567890abcdefGHIJ', modelo: 'gpt-4o-mini' }); assert.equal(r.s, 200);
   r = await A.r('POST', '/v1/ferramentas/reajuste/simular', { cenario: 'metalúrgico' }); assert.equal(r.s, 200, JSON.stringify(r.j));
   assert.deepEqual(r.j.valores, { salario: 3500, perc: 6, meses: 4 }); assert.equal(r.j.explicacao.length, 1); assert.equal(r.j.resumo, 'Reajuste de 6%.');
-  r = await A.r('POST', '/v1/ferramentas/reajuste', r.j.valores); assert.equal(r.s, 200, 'os valores simulados calculam');
+  assert.equal(r.j.modo, 'exemplo');
+  r = await A.r('POST', '/v1/ferramentas/reajuste/simular', { atual: { salario: 5000 } }); assert.equal(r.s, 200, JSON.stringify(r.j));
+  assert.equal(r.j.modo, 'completar'); assert.deepEqual(r.j.valores, { perc: 6, meses: 4 }, 'não sobrescreve o que o usuário preencheu');
+  r = await A.r('POST', '/v1/ferramentas/reajuste', { salario: 3500, perc: 6, meses: 4 }); assert.equal(r.s, 200, 'os valores simulados calculam');
   r = await A.r('POST', '/v1/ferramentas/reajuste/explicar', { salario: 3500, perc: 6, meses: 4 }); assert.equal(r.s, 200, JSON.stringify(r.j)); assert.ok(typeof r.j.explicacao === 'string' && r.j.explicacao.length > 0);
   r = await A.r('POST', '/v1/ferramentas/aso/explicar', {}); assert.equal(r.s, 400);
   r = await A.r('POST', '/v1/ferramentas/reajuste/explicar', { salario: 'abc' }); assert.equal(r.s, 422);

@@ -192,8 +192,8 @@ Prazo de envio|eSocial|Limite legal para transmitir cada evento ao eSocial, vari
 Registro|Sistema|Item guardado no banco, como um ASO, treinamento, ficha de EPI ou vaga, ligado a empresa e funcionário, com datas, validade e situação.
 Quadro de Registros|Sistema|Aba em formato kanban com colunas Em aberto, Concluído e Cancelado. Mostra o que há para fazer e permite criar, editar, mover e excluir registros.
 Kanban|Sistema|Quadro visual em colunas que representam a situação do trabalho; os cartões se movem conforme avançam.
-Ferramenta|Sistema|Calculadora ou formulário do sistema (233 no total). Tipo "cálculo" mostra resultado; tipo "registro" guarda o dado no banco.
-Simulação com IA|Sistema|Botão em cada ferramenta que preenche um exemplo fictício para você aprender a usar, com explicação de cada campo.
+Ferramenta|Sistema|Calculadora ou formulário do sistema (mais de 230). Tipo "cálculo" mostra resultado; tipo "registro" guarda o dado no banco.
+Completar com IA|Sistema|Botão em cada ferramenta: você preenche uma parte e a IA, como superusuário, completa o restante de acordo com o que você informou (destacado em roxo), sem sobrescrever seus dados e listando o que conferir. Se nada for preenchido, gera um exemplo fictício para aprender. Nada é gravado até você salvar.
 Explicar o cálculo|Sistema|Botão que a IA usa para descrever, passo a passo, como o resultado foi obtido.
 Documentos|Sistema|Aba com mais de 200 modelos de laudos, relatórios, contratos, declarações e comunicados, preenchidos com dados da empresa e do colaborador, com impressão em PDF.
 Vencimento|Sistema|Data-limite de um registro (validade de exame, treinamento, CA ou prazo). O sistema destaca os vencidos e os que vencem em breve.
@@ -204,6 +204,12 @@ RLS|Sistema|Row Level Security, recurso do PostgreSQL que restringe cada consult
 Agente de IA|Sistema|Assistente que consulta dados do sistema por ferramentas controladas e responde perguntas contábeis, sem inventar números.
 Chave da OpenAI|Sistema|Credencial que permite usar a IA. É guardada criptografada e só o administrador pode trocá-la.
 Dados de teste|Sistema|Empresas e funcionários fictícios, com prefixo "TESTE - ", que o administrador gera para treinar e remove com um clique.
+Profissional responsável|Sistema|Pessoa que assina laudos, programas e relatórios (técnico ou engenheiro de segurança, médico do trabalho, analista de RH, contador). O cadastro guarda profissão, conselho, nº do registro, registro no MTE e ART com validade.
+Conselho profissional|Sistema|Órgão que registra e fiscaliza uma profissão: CREA (engenharia), CRM (medicina), CRC (contabilidade), CRT (técnicos industriais), CRP (psicologia), OAB (advocacia), COREN (enfermagem), entre outros.
+Registro no MTE|SST|Registro profissional de técnico ou engenheiro de segurança do trabalho no Ministério do Trabalho, exigido além do conselho para atuar nos serviços de SST, conforme a norma vigente.
+ART|SST|Anotação de Responsabilidade Técnica. Documento que registra no CREA quem é o responsável técnico por um serviço de engenharia (laudos, projetos, programas). Existem equivalentes em outros conselhos (RRT, TRT).
+Fotos e anexos|Sistema|Imagens ligadas a funcionários, registros e profissionais. São reduzidas antes do envio e guardadas no banco; evite fotos de documentos pessoais sem necessidade (LGPD).
+Documento emitido|Sistema|Cópia gravada em Registros de cada documento gerado na aba Documentos, com quem emitiu (usuário logado), empresa e colaborador.
 Indicador da IA|Sistema|Sinal (verde, amarelo, vermelho) que a IA dá na análise do candidato, como apoio; a decisão final é sempre humana.
 `;
 export const TERMOS: Termo[] = TXT.split('\n').map(l => l.trim()).filter(Boolean).map(l => { const [termo, area, ...r] = l.split('|'); return { termo, area: area as Termo['area'], explicacao: r.join('|') }; })

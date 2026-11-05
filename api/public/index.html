@@ -261,13 +261,20 @@ function abrirForm(titulo,nodes,aoSalvar,grid){document.getElementById('frmDel')
  $('frmF').onsubmit=async ev=>{ev.preventDefault();try{await aoSalvar();$('frm').close()}catch(e){$('frmM').textContent=e.message}};$('frmX').onclick=()=>$('frm').close();$('frm').showModal()}
 const inCampo=c=>{let i;if(c.t==='sel')i=el('select',{},...c.op.map(([v,t])=>el('option',{value:v,textContent:t})));else if(c.t==='bool'){i=el('input',{type:'checkbox'});i.checked=!!c.v}else if(c.t==='area'){i=el('textarea',{rows:3})}else i=el('input',{type:c.t==='data'?'date':'text',inputMode:c.t==='num'?'decimal':'text'});if(c.t!=='bool')i.value=c.v??'';return i};
 const valCampo=(c,i)=>c.t==='bool'?i.checked:i.value;
-/* "Gerar simulação com IA": preenche o formulário com exemplo fictício e explica cada campo (nada é gravado) */
-function blocoSimulacao(f,ins,aoPreencher){const box=el('div',{className:'sim'});const cen=el('input',{placeholder:'Cenário (opcional): ex.: operador de produção com 3 dependentes',style:'flex:1;min-width:180px'});
- const bt=el('button',{className:'sec',textContent:'✨ Gerar simulação com IA'});const msgEl=el('p',{className:'mut',style:'margin:4px 0'});const ex=el('div',{});
- bt.onclick=async()=>{bt.disabled=true;msgEl.className='mut';msgEl.textContent='Gerando simulação…';ex.replaceChildren();try{const r=await call('POST','/v1/ferramentas/'+f.id+'/simular',{cenario:cen.value||undefined});
-  for(const c of f.campos){const v=r.valores[c.n];if(v===undefined||!ins[c.n])continue;if(c.t==='bool')ins[c.n].checked=!!v;else ins[c.n].value=String(v)}
-  msgEl.textContent=(r.resumo||'Simulação preenchida com dados fictícios.')+' Confira e ajuste os valores antes de usar.';
-  if(r.explicacao.length){const nm=Object.fromEntries(f.campos.map(c=>[c.n,c.l]));const ul=el('ul',{style:'margin:4px 0 0 18px;padding:0'});for(const x of r.explicacao)ul.append(el('li',{textContent:(nm[x.campo]||x.campo)+': '+x.como}));ex.replaceChildren(el('details',{open:true},el('summary',{textContent:'Como preencher cada campo'}),ul))}
+/* "Completar com IA": o usuário preenche uma parte; a IA (como superusuário) completa o restante de forma coerente, sem sobrescrever o que foi digitado.
+   Sem nada preenchido, gera um exemplo fictício para aprender. Nada é gravado. */
+function blocoSimulacao(f,ins,aoPreencher){const box=el('div',{className:'sim'});const cen=el('input',{placeholder:'Contexto (opcional): ex.: operador de produção, turno noturno, 3 dependentes',style:'flex:1;min-width:180px'});
+ const bt=el('button',{className:'sec',textContent:'✨ Completar com IA'});const msgEl=el('p',{className:'mut',style:'margin:4px 0'});const ex=el('div',{});
+ const dado=(c,i)=>{if(c.t==='bool')return i.checked;const v=String(i.value??'').trim();const pad=c.t==='sel'?String(c.v??c.op?.[0]?.[0]??''):String(c.v??'');return v!==''&&v!==pad};
+ bt.onclick=async()=>{bt.disabled=true;msgEl.className='mut';msgEl.textContent='A IA está analisando os dados e completando…';ex.replaceChildren();
+  const atual={};const meus=new Set();for(const c of f.campos){const i=ins[c.n];if(i&&dado(c,i)){atual[c.n]=valCampo(c,i);meus.add(c.n)}}
+  try{const r=await call('POST','/v1/ferramentas/'+f.id+'/simular',{cenario:cen.value||undefined,atual});
+  const feitos=[];for(const c of f.campos){const v=r.valores[c.n];if(v===undefined||!ins[c.n]||meus.has(c.n))continue;if(c.t==='bool')ins[c.n].checked=!!v;else ins[c.n].value=String(v);ins[c.n].style.outline='2px solid #7c3aed';ins[c.n].title='Preenchido pela IA — confira';feitos.push(c.l)}
+  msgEl.textContent=(r.modo==='completar'?'Completei '+feitos.length+' campo(s) com base no que você informou (destacados em roxo). ':'Exemplo fictício preenchido (nada foi informado por você). ')+(r.resumo||'')+' Revise antes de usar.';
+  const nm=Object.fromEntries(f.campos.map(c=>[c.n,c.l]));const partes=[];
+  if(r.conferir&&r.conferir.length){const ul=el('ul',{style:'margin:4px 0 0 18px;padding:0'});for(const x of r.conferir)ul.append(el('li',{textContent:x}));partes.push(el('details',{open:true},el('summary',{textContent:'⚠ A conferir antes de usar'}),ul))}
+  if(r.explicacao.length){const ul=el('ul',{style:'margin:4px 0 0 18px;padding:0'});for(const x of r.explicacao)ul.append(el('li',{textContent:(nm[x.campo]||x.campo)+': '+x.como}));partes.push(el('details',{open:r.modo!=='completar'},el('summary',{textContent:'Por que cada campo foi preenchido assim'}),ul))}
+  ex.replaceChildren(...partes);
   if(aoPreencher)aoPreencher()}catch(e){if(e.status===401)return mostrarAuth();msgEl.className='msg';msgEl.textContent=e.message}finally{bt.disabled=false}};
  box.append(el('div',{className:'bar',style:'margin:0;border:0;padding:0'},bt,cen),msgEl,ex);return box}
 const nomeFerr=id=>(FERR||[]).find(f=>f.id===id)?.nome||id;
