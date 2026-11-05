@@ -1,5 +1,5 @@
 -- =====================================================================
--- ERP CONTÁBIL SaaS — Schema PostgreSQL 15+
+-- SISTEMA GÊNESIS ERP — Schema PostgreSQL 15+
 -- Multi-tenant por Row-Level Security (RLS): 1 banco, coluna tenant_id,
 -- política aplicada via  SET LOCAL app.tenant_id = '<uuid>'  em cada transação.
 -- =====================================================================

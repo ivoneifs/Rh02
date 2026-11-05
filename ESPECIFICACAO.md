@@ -1,4 +1,4 @@
-# ERP Contábil SaaS — Especificação Técnica
+# Sistema Gênesis ERP — Especificação Técnica
 
 > Referência funcional: Módulo Contábil do Calima ERP (cópia da página + tela do *Balancete dinâmico* na pasta `F:\RH`).
 > Esta especificação é acompanhada de código **executado e testado**: `db/01_schema.sql` (aplicado em PostgreSQL 16), `src/*` (5 testes passando) e `src/relatorios/balancete.sql` (rodado contra dados reais de teste).

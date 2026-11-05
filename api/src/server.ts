@@ -213,5 +213,5 @@ const server = http.createServer(async (req, res) => {
   }
 });
 const porta = Number(process.env.PORT ?? 3000);
-server.listen(porta, '0.0.0.0', () => console.log(`ERP Contábil API em :${porta}`));
+server.listen(porta, '0.0.0.0', () => console.log(`Sistema Gênesis ERP API em :${porta}`));
 process.on('SIGTERM', () => server.close(() => pool.end().then(() => process.exit(0))));

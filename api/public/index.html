@@ -1,5 +1,5 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ERP Contábil</title>
+<title>Sistema Gênesis ERP</title>
 <style>.dot{display:inline-block;width:13px;height:13px;border-radius:50%;vertical-align:middle;border:1px solid rgba(0,0,0,.2);cursor:help}.dot.VERDE{background:#16a34a}.dot.AMARELO{background:#f59e0b}.dot.VERMELHO{background:#dc2626}.dot.CINZA{background:#9ca3af}
 .sem{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}.sem .chip{display:flex;gap:6px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12px}.sem .chip b{font-size:12px}.sem button.sm{padding:1px 7px}
 tbody tr:nth-child(even){background:rgba(100,116,139,.06)}tbody tr:hover{background:rgba(37,99,235,.08)}thead th{position:sticky;top:0;background:var(--card)}
@@ -37,7 +37,7 @@ dialog.pq{width:min(420px,95vw)}
 
 <!-- ============ Login / Cadastro ============ -->
 <div id="auth" class="hide">
-  <div class="card"><h1>ERP Contábil</h1>
+  <div class="card"><h1>Sistema Gênesis ERP</h1>
     <div id="fLogin" style="display:grid;gap:10px">
       <label>E-mail<input id="lEmail" type="email" autocomplete="username"></label>
       <label>Senha<input id="lSenha" type="password" autocomplete="current-password"></label>
@@ -58,7 +58,7 @@ dialog.pq{width:min(420px,95vw)}
 
 <!-- ============ Aplicação ============ -->
 <div id="app" class="hide">
-<header><b>ERP Contábil</b>
+<header><b>Sistema Gênesis ERP</b>
   <nav><button data-t="bal" class="on">Balancete</button><button data-t="fun">Funcionários</button><button data-t="fer">Ferramentas</button><button data-t="reg">Registros</button><button data-t="doc">Documentos</button><button data-t="pro">Profissionais</button><button data-t="glo">Glossário</button><button data-t="ia">Agente de IA</button><button data-t="adm" id="tAdm" class="hide">Administração</button></nav>
   <div class="sp"></div><span id="quem"></span><button class="sec sm" id="bSenha" style="color:#fff;border-color:#fff">Alterar senha</button><button class="sec sm" id="bSair" style="color:#fff;border-color:#fff">Sair</button></header>
 <main>
