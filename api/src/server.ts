@@ -7,12 +7,13 @@ import { pool, dbDoTenant, isUuid } from './db.ts';
 import { criarLancamento, ErroDeNegocio } from '../../src/lancamentos/lancamento.service.ts';
 import { parseOFX } from '../../src/conciliacao/ofx-parser.ts';
 import { sugerir, ClassificadorHistorico, type Regra } from '../../src/conciliacao/motor-regras.ts';
+import { SQL_BALANCETE, SQL_RAZAO } from './sql.ts';
+import { lerConfig, salvarConfig, removerChave, conversar } from './ia-rotas.ts';
+import { ErroLLM } from './agente.ts';
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const TOKEN = process.env.API_TOKEN ?? '';
 if (TOKEN.length < 24) { console.error('API_TOKEN ausente ou curto (mín. 24 caracteres).'); process.exit(1); }
-const sqls = readFileSync(join(raiz, 'src/relatorios/balancete.sql'), 'utf8').split(';').filter(q => /SELECT/.test(q)).map(q => q.trim());
-const [SQL_BALANCETE, SQL_RAZAO] = sqls;
 const INDEX = readFileSync(join(raiz, 'api/public/index.html'));
 
 const json = (res: http.ServerResponse, code: number, body: unknown) => {
@@ -42,6 +43,15 @@ const server = http.createServer(async (req, res) => {
     const db = dbDoTenant(tenant);
     let m: RegExpExecArray | null;
 
+    if (p === '/v1/ia/config') {
+      if (req.method === 'GET') return json(res, 200, await lerConfig(db));
+      if (req.method === 'PUT') { await salvarConfig(db, tenant, JSON.parse(await lerCorpo(req, 20_000))); return json(res, 200, await lerConfig(db)); }
+      if (req.method === 'DELETE') { await removerChave(db); return json(res, 200, await lerConfig(db)); }
+    }
+    if (req.method === 'POST' && (m = /^\/v1\/empresas\/([^/]+)\/ia\/chat$/.exec(p))) {
+      if (!isUuid(m[1])) return json(res, 400, { erro: 'empresa inválida' });
+      return json(res, 200, await conversar(db, m[1], JSON.parse(await lerCorpo(req, 100_000))));
+    }
     if (req.method === 'GET' && p === '/v1/empresas')
       return json(res, 200, await db.transaction(async tx => (await tx.query('SELECT id, cnpj, razao_social, regime_tributario FROM empresas ORDER BY razao_social')).rows));
 
@@ -86,6 +96,8 @@ const server = http.createServer(async (req, res) => {
     return json(res, 404, { erro: 'rota não encontrada' });
   } catch (e: any) {
     if (e instanceof ErroDeNegocio) return json(res, 422, { codigo: e.codigo, detalhes: e.detalhes });
+    if (e instanceof ErroLLM) return json(res, e.status === 401 ? 502 : e.status >= 500 ? 502 : e.status, { erro: e.status === 401 ? 'A OpenAI rejeitou a chave. Cadastre uma chave válida.' : e.message });
+    if (e instanceof RangeError) return json(res, 400, { erro: e.message });
     if (e instanceof SyntaxError) return json(res, 400, { erro: 'JSON inválido' });
     if (e?.code === '23514' || e?.code === '23505' || e?.code === 'P0001') return json(res, 422, { erro: e.message });   // check/unique/trigger do banco
     console.error(e); return json(res, 500, { erro: 'erro interno' });

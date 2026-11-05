@@ -4,7 +4,7 @@
 > Esta especificação é acompanhada de código **executado e testado**: `db/01_schema.sql` (aplicado em PostgreSQL 16), `src/*` (5 testes passando) e `src/relatorios/balancete.sql` (rodado contra dados reais de teste).
 
 ## Sumário
-> **Módulo SST** (PGR, EPI, psicossociais, PCMSO/ASO, LTCAT/PPP/FAP, eSocial, financeiro, GED): ver `ESPECIFICACAO_SST.md`.
+> **Módulo SST** (PGR, EPI, psicossociais, PCMSO/ASO, LTCAT/PPP/FAP, eSocial, financeiro, GED): ver `ESPECIFICACAO_SST.md`. **Agente de IA** e cofre da chave OpenAI: `ESPECIFICACAO_IA.md`.
 
 1. Arquitetura e stack
 2. Modelagem de dados
@@ -287,5 +287,5 @@ Erros **bloqueiam a geração** (o PVA rejeitaria); avisos vão ao "Relatório d
 # Banco (PostgreSQL 15+)
 createdb erp && psql -d erp -f db/01_schema.sql   # + db/02_sst.sql e db/03_sst_gestao.sql (módulo SST)
 # Testes dos módulos (Node 22+)
-node --experimental-strip-types --test test/smoke.test.ts test/sst.test.ts
+node --experimental-strip-types --test test/smoke.test.ts test/sst.test.ts test/agente.test.ts
 ```

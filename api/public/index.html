@@ -27,6 +27,17 @@ dialog{border:1px solid var(--line);border-radius:10px;background:var(--card);co
 <button id="bCons">Consultar</button></div>
 <div id="msg"></div>
 <div class="tw"><table><thead><tr><th>Conta</th><th>Título</th><th>C.R.</th><th class="n">Saldo anterior</th><th class="n">Débito</th><th class="n">Crédito</th><th class="n">Saldo final</th><th>Razão</th></tr></thead><tbody id="tb"></tbody></table></div>
+<section class="bar" style="margin-top:16px;display:block" id="ia">
+<h3 style="margin:0 0 8px">Agente de IA</h3>
+<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:end">
+<label>Chave da OpenAI<input id="ikey" type="password" autocomplete="off" placeholder="sk-..." size="30"></label>
+<label>Modelo<input id="imod" size="16" value="gpt-4o-mini"></label>
+<label>Limite de tokens/mês<input id="ilim" type="number" min="0" value="200000" style="width:120px"></label>
+<button id="iSalvar">Salvar</button><button class="sec" id="iRemover">Remover chave</button></div>
+<p id="iStatus" style="color:var(--mut);margin:8px 0"></p>
+<div id="chat" class="tw" style="padding:10px;max-height:280px"></div>
+<div style="display:flex;gap:8px;margin-top:8px"><input id="ipg" style="flex:1" placeholder="Pergunte: ex.: resuma o balancete de janeiro de 2025"><button id="iEnv">Enviar</button></div>
+</section>
 </main>
 <dialog id="dlg"><h3 id="dt">Razão</h3><div class="tw"><table><thead><tr><th>Data</th><th>Nº</th><th>Documento</th><th>Contrapartida</th><th class="n">Débito</th><th class="n">Crédito</th><th class="n">Saldo</th></tr></thead><tbody id="rb"></tbody></table></div><p><button class="sec" id="fch">Fechar</button></p></dialog>
 <script>
@@ -51,4 +62,15 @@ async function razao(r){try{const q=new URLSearchParams({conta:r.id,de:$('de').v
  $('rb').replaceChildren(...rows.map(x=>{const tr=document.createElement('tr');tr.append(td(x.data.slice(0,10)),td(x.numero),td(x.documento||''),td(x.conta_contrapartida||''),td(x.debito?money(x.debito):'','n'),td(x.credito?money(x.credito):'','n'),td(dc(x.saldo_acumulado),'n'));return tr}));
  $('dlg').showModal()}catch(e){err(e)}}
 $('fch').onclick=()=>$('dlg').close();
+
+const hist=[];const bolha=(t,q)=>{const d=document.createElement('div');d.style.cssText='margin:6px 0;white-space:pre-wrap;'+(q==='u'?'font-weight:600':'');d.textContent=(q==='u'?'Você: ':'IA: ')+t;$('chat').append(d);$('chat').scrollTop=1e9};
+const apiM=async(m,p,b)=>{const r=await fetch(p,{method:m,headers:{authorization:'Bearer '+$('tok').value,'x-tenant-id':$('ten').value,'content-type':'application/json'},body:b?JSON.stringify(b):undefined});
+ const j=await r.json();if(!r.ok)throw new Error(j.erro||('HTTP '+r.status));return j};
+const stat=c=>{$('iStatus').textContent=c.configurado?`Chave configurada (${c.origemChave}${c.chaveFinal?', final …'+c.chaveFinal:''}) · modelo ${c.modelo} · uso no mês: ${c.usoTokensMes}/${c.limiteTokensMes} tokens`:'Nenhuma chave configurada.'+(c.criptografiaDisponivel?'':' (servidor sem IA_MASTER_KEY: não é possível salvar chave)');$('imod').value=c.modelo;$('ilim').value=c.limiteTokensMes};
+$('iSalvar').onclick=async()=>{try{$('msg').textContent='';const b={modelo:$('imod').value,limiteTokensMes:Number($('ilim').value)};if($('ikey').value)b.apiKey=$('ikey').value;
+ stat(await apiM('PUT','/v1/ia/config',b));$('ikey').value=''}catch(e){err(e)}};
+$('iRemover').onclick=async()=>{try{stat(await apiM('DELETE','/v1/ia/config'))}catch(e){err(e)}};
+$('bEmp').addEventListener('click',()=>setTimeout(async()=>{try{stat(await apiM('GET','/v1/ia/config'))}catch{}},600));
+$('iEnv').onclick=async()=>{const t=$('ipg').value.trim();if(!t||!$('emp').value)return;$('ipg').value='';hist.push({role:'user',content:t});bolha(t,'u');
+ try{const r=await apiM('POST',`/v1/empresas/${$('emp').value}/ia/chat`,{mensagens:hist.slice(-12)});hist.push({role:'assistant',content:r.resposta});bolha(r.resposta,'a')}catch(e){bolha('Erro: '+e.message,'a')}};
 </script></body></html>

@@ -29,6 +29,9 @@ services:
       APP_DB_PASSWORD: ${APP_DB_PASSWORD}
       API_TOKEN: ${API_TOKEN:?defina API_TOKEN (min. 24 caracteres)}
       SEED_DEMO: ${SEED_DEMO:-false}
+      IA_MASTER_KEY: ${IA_MASTER_KEY:?defina IA_MASTER_KEY (openssl rand -hex 32)}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       PORT: "3000"
     expose:
       - "3000"
