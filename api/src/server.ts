@@ -12,7 +12,10 @@ import { lerConfig, salvarConfig, removerChave, conversar } from './ia-rotas.ts'
 import { ErroLLM } from './agente.ts';
 import * as auth from './auth.ts';
 import * as normas from './normas.ts';
-import { catalogo, executar, ErroCalc } from './ferramentas.ts';
+import * as pessoal from './pessoal.ts';
+import * as registros from './registros.ts';
+import { catalogo, executar } from './catalogo.ts';
+import { ErroCalc } from './ferramentas.ts';
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const TOKEN = process.env.API_TOKEN ?? '';
@@ -63,9 +66,20 @@ const server = http.createServer(async (req, res) => {
 
     let m: RegExpExecArray | null;
     // Ferramentas de cálculo (qualquer papel logado) e Normas (leitura: todos; alteração: ADMIN)
-    if (p.startsWith('/v1/ferramentas') || p.startsWith('/v1/normas')) {
+    if (p.startsWith('/v1/ferramentas') || p.startsWith('/v1/normas') || p.startsWith('/v1/registros') || p.startsWith('/v1/funcionarios') || p.startsWith('/v1/cargos') || p.startsWith('/v1/ambientes') || /^\/v1\/empresas\/[^/]+\/(funcionarios|cargos|ambientes)$/.test(p)) {
       const s = await auth.sessaoDe(req); if (!s) return json(res, 401, { erro: 'não autenticado' });
       const corpo = async () => JSON.parse(await lerCorpo(req, 200_000));
+      const qp = url.searchParams;
+      if ((m = /^\/v1\/empresas\/([^/]+)\/funcionarios$/.exec(p))) { if (req.method === 'GET') return json(res, 200, await pessoal.listarFuncionarios(s, m[1], qp.get('q') ?? undefined, qp.get('ativos') === '1')); if (req.method === 'POST') return json(res, 201, await pessoal.criarFuncionario(s, m[1], await corpo())); }
+      if ((m = /^\/v1\/funcionarios\/([^/]+)$/.exec(p))) { if (req.method === 'GET') return json(res, 200, await pessoal.obterFuncionario(s, m[1])); if (req.method === 'PATCH') return json(res, 200, await pessoal.editarFuncionario(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await pessoal.excluirFuncionario(s, m[1])); }
+      for (const [rota, mod] of [['cargos', pessoal.cargos], ['ambientes', pessoal.ambientes]] as const) {
+        if ((m = new RegExp(`^/v1/empresas/([^/]+)/${rota}$`).exec(p))) { if (req.method === 'GET') return json(res, 200, await mod.listar(s, m[1])); if (req.method === 'POST') return json(res, 201, await mod.criar(s, m[1], await corpo())); }
+        if ((m = new RegExp(`^/v1/${rota}/([^/]+)$`).exec(p))) { if (req.method === 'PATCH') return json(res, 200, await mod.editar(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await mod.excluir(s, m[1])); }
+      }
+      if (p === '/v1/registros/vencimentos' && req.method === 'GET') return json(res, 200, await registros.vencimentos(s, Number(qp.get('dias') ?? 30) || 30, qp.get('empresa') ?? undefined));
+      if (p === '/v1/registros' && req.method === 'GET') return json(res, 200, await registros.listar(s, { ferramenta: qp.get('ferramenta') ?? undefined, empresa: qp.get('empresa') ?? undefined, funcionario: qp.get('funcionario') ?? undefined, status: qp.get('status') ?? undefined }));
+      if (p === '/v1/registros' && req.method === 'POST') return json(res, 201, await registros.criar(s, await corpo()));
+      if ((m = /^\/v1\/registros\/([^/]+)$/.exec(p))) { if (req.method === 'PATCH') return json(res, 200, await registros.editar(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await registros.excluir(s, m[1])); }
       if (p === '/v1/ferramentas' && req.method === 'GET') return json(res, 200, catalogo());
       if ((m = /^\/v1\/ferramentas\/([a-z0-9_]+)$/i.exec(p)) && req.method === 'POST') return json(res, 200, executar(m[1], await corpo(), await normas.vigentes(s)));
       if (p === '/v1/normas/categorias' && req.method === 'GET') return json(res, 200, Object.entries(normas.CATEGORIAS).map(([id, c]) => ({ id, ...c })));

@@ -1,23 +1,24 @@
 // Catálogo de ferramentas de cálculo (folha/DP, rescisão, fiscal/contábil, SST). Funções PURAS: recebem a entrada + os parâmetros legais vigentes
 // (tabela "normas") e devolvem linhas de resultado. São apoio ao profissional: confira sempre a norma e o caso concreto.
 export type Fmt = 'brl' | 'pct' | 'num' | 'txt';
-export interface Campo { n: string; l: string; t: 'num' | 'txt' | 'data' | 'sel' | 'bool'; v?: any; op?: [string, string][] }
+export interface Campo { n: string; l: string; t: 'num' | 'txt' | 'data' | 'sel' | 'bool' | 'area'; v?: any; op?: [string, string][] }
 export interface Res { linhas: { r: string; v: number | string; f: Fmt; forte?: boolean }[]; aviso?: string }
-export interface Ferr { id: string; cat: 'Folha e DP' | 'Rescisão e férias' | 'Fiscal e contábil' | 'SST e indicadores'; nome: string; desc: string; campos: Campo[]; calc(e: any, P: any): Res }
+export interface Registro { data?: string; validade?: string; func?: boolean; empresa?: boolean }
+export interface Ferr { id: string; cat: string; nome: string; desc: string; campos: Campo[]; calc(e: any, P: any): Res; tipo?: 'calc' | 'registro'; registro?: Registro }
 export class ErroCalc extends Error {}
 
-const r2 = (x: number) => Math.round((x + Number.EPSILON) * 100) / 100;
-const num = (e: any, k: string, min = 0, max = 1e12) => { const v = Number(String(e?.[k] ?? '').replace(',', '.')); if (!Number.isFinite(v) || v < min || v > max) throw new ErroCalc(`Valor inválido em "${k}".`); return v; };
-const dt = (e: any, k: string) => { const s = e?.[k]; if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) throw new ErroCalc(`Data inválida em "${k}" (AAAA-MM-DD).`); const d = new Date(s + 'T00:00:00Z'); if (isNaN(+d) || d.toISOString().slice(0, 10) !== s) throw new ErroCalc(`Data inexistente em "${k}".`); return d; };
-const L = (r: string, v: number | string, f: Fmt = 'brl', forte = false) => ({ r, v: typeof v === 'number' && f === 'brl' ? r2(v) : v, f, forte });
+export const r2 = (x: number) => Math.round((x + Number.EPSILON) * 100) / 100;
+export const num = (e: any, k: string, min = 0, max = 1e12) => { const v = Number(String(e?.[k] ?? '').replace(',', '.')); if (!Number.isFinite(v) || v < min || v > max) throw new ErroCalc(`Valor inválido em "${k}".`); return v; };
+export const dt = (e: any, k: string) => { const s = e?.[k]; if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) throw new ErroCalc(`Data inválida em "${k}" (AAAA-MM-DD).`); const d = new Date(s + 'T00:00:00Z'); if (isNaN(+d) || d.toISOString().slice(0, 10) !== s) throw new ErroCalc(`Data inexistente em "${k}".`); return d; };
+export const L = (r: string, v: number | string, f: Fmt = 'brl', forte = false) => ({ r, v: typeof v === 'number' && f === 'brl' ? r2(v) : v, f, forte });
 const DIA = 86400000;
-const dias = (a: Date, b: Date) => Math.round((+b - +a) / DIA);
-const addDias = (d: Date, n: number) => new Date(+d + n * DIA);
-const iso = (d: Date) => d.toISOString().slice(0, 10);
-const diasNoMes = (a: number, m: number) => new Date(Date.UTC(a, m, 0)).getUTCDate();
-const addMeses = (d: Date, n: number) => { const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1)); t.setUTCDate(Math.min(d.getUTCDate(), diasNoMes(t.getUTCFullYear(), t.getUTCMonth() + 1))); return t; };
+export const dias = (a: Date, b: Date) => Math.round((+b - +a) / DIA);
+export const addDias = (d: Date, n: number) => new Date(+d + n * DIA);
+export const iso = (d: Date) => d.toISOString().slice(0, 10);
+export const diasNoMes = (a: number, m: number) => new Date(Date.UTC(a, m, 0)).getUTCDate();
+export const addMeses = (d: Date, n: number) => { const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1)); t.setUTCDate(Math.min(d.getUTCDate(), diasNoMes(t.getUTCFullYear(), t.getUTCMonth() + 1))); return t; };
 /** anos completos entre a e b */
-const anosCompletos = (a: Date, b: Date) => { let n = b.getUTCFullYear() - a.getUTCFullYear(); if (+addMeses(a, n * 12) > +b) n--; return Math.max(0, n); };
+export const anosCompletos = (a: Date, b: Date) => { let n = b.getUTCFullYear() - a.getUTCFullYear(); if (+addMeses(a, n * 12) > +b) n--; return Math.max(0, n); };
 const mesesFrac = (a: Date, b: Date) => { // meses completos + 1 se sobra >= 15 dias (regra de "avos"), b exclusivo +1 dia
   let m = (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + b.getUTCMonth() - a.getUTCMonth(); if (+addMeses(a, m) > +addDias(b, 1)) m--; const sobra = dias(addMeses(a, m), addDias(b, 1)); return m + (sobra >= 15 ? 1 : 0); };
 
@@ -32,14 +33,14 @@ export function irrf(bruto: number, inssv: number, deps: number, P: any, simplif
   return { base: r2(base), imposto: r2(Math.max(0, imp - red)), reducao: r2(Math.min(imp, red)), usouSimpl };
 }
 const tabFaixa = (rbt: number, anexo: string, P: any) => { const fx: number[][] | undefined = P.SIMPLES_ANEXOS[anexo]; if (!fx) throw new ErroCalc('Anexo inválido.'); const f = fx.find(x => rbt <= x[0]); if (!f) throw new ErroCalc('RBT12 acima do limite do Simples Nacional.'); return f; };
-const proxUtil = (d: Date, antecipa: boolean) => { let x = d; while ([0, 6].includes(x.getUTCDay())) x = addDias(x, antecipa ? -1 : 1); return x; };
-const cpfOk = (s: string) => { const c = s.replace(/\D/g, ''); if (c.length !== 11 || /^(\d)\1+$/.test(c)) return false; for (const n of [9, 10]) { let sm = 0; for (let i = 0; i < n; i++) sm += +c[i] * (n + 1 - i); if (((sm * 10) % 11) % 10 !== +c[n]) return false; } return true; };
-const cnpjOk = (s: string) => { const c = s.replace(/\D/g, ''); if (c.length !== 14 || /^(\d)\1+$/.test(c)) return false; for (const n of [12, 13]) { let sm = 0, p = n - 7; for (let i = 0; i < n; i++) { sm += +c[i] * p--; if (p < 2) p = 9; } const dv = sm % 11 < 2 ? 0 : 11 - (sm % 11); if (dv !== +c[n]) return false; } return true; };
+export const proxUtil = (d: Date, antecipa: boolean) => { let x = d; while ([0, 6].includes(x.getUTCDay())) x = addDias(x, antecipa ? -1 : 1); return x; };
+export const cpfOk = (s: string) => { const c = s.replace(/\D/g, ''); if (c.length !== 11 || /^(\d)\1+$/.test(c)) return false; for (const n of [9, 10]) { let sm = 0; for (let i = 0; i < n; i++) sm += +c[i] * (n + 1 - i); if (((sm * 10) % 11) % 10 !== +c[n]) return false; } return true; };
+export const cnpjOk = (s: string) => { const c = s.replace(/\D/g, ''); if (c.length !== 14 || /^(\d)\1+$/.test(c)) return false; for (const n of [12, 13]) { let sm = 0, p = n - 7; for (let i = 0; i < n; i++) { sm += +c[i] * p--; if (p < 2) p = 9; } const dv = sm % 11 < 2 ? 0 : 11 - (sm % 11); if (dv !== +c[n]) return false; } return true; };
 
-const N = (n: string, l: string, v: any = '', t: Campo['t'] = 'num'): Campo => ({ n, l, t, v });
-const D = (n: string, l: string, v = ''): Campo => ({ n, l, t: 'data', v });
-const S = (n: string, l: string, op: [string, string][], v?: string): Campo => ({ n, l, t: 'sel', op, v: v ?? op[0][0] });
-const B = (n: string, l: string, v = false): Campo => ({ n, l, t: 'bool', v });
+export const N = (n: string, l: string, v: any = '', t: Campo['t'] = 'num'): Campo => ({ n, l, t, v });
+export const D = (n: string, l: string, v = ''): Campo => ({ n, l, t: 'data', v });
+export const S = (n: string, l: string, op: [string, string][], v?: string): Campo => ({ n, l, t: 'sel', op, v: v ?? op[0][0] });
+export const B = (n: string, l: string, v = false): Campo => ({ n, l, t: 'bool', v });
 const SAL = N('salario', 'Salário mensal (R$)', 3000), DEP = N('deps', 'Dependentes (IRRF)', 0);
 const TIPOS_RESC: [string, string][] = [['sem_justa', 'Dispensa sem justa causa'], ['pedido', 'Pedido de demissão'], ['justa', 'Dispensa por justa causa'], ['acordo', 'Acordo (art. 484-A)'], ['termino_exp', 'Término de contrato de experiência/determinado']];
 const SETORES: [string, string][] = [['comercio', 'Comércio'], ['industria', 'Indústria'], ['servicos', 'Serviços em geral'], ['servicos_hospitalares', 'Serviços hospitalares'], ['transporte_carga', 'Transporte de cargas'], ['transporte_passageiros', 'Transporte de passageiros']];
@@ -176,7 +177,7 @@ export const FERRAMENTAS: Ferr[] = [
   { id: 'absent', cat: 'SST e indicadores', nome: 'Absenteísmo', desc: 'Horas/dias ausentes ÷ horas/dias previstas.', campos: [N('aus', 'Ausências (dias)', 30), N('prev', 'Dias previstos de trabalho', 1760)],
     calc: (e) => ({ linhas: [L('Absenteísmo', num(e, 'aus') / num(e, 'prev', 1), 'pct', true)] }) },
 ];
-export const catalogo = () => FERRAMENTAS.map(({ calc, ...c }) => c);
+export const catalogo = () => FERRAMENTAS.map(({ calc, ...c }) => ({ ...c, tipo: 'calc' as const }));
 export function executar(id: string, entrada: any, P: any): Res {
   const f = FERRAMENTAS.find(x => x.id === id); if (!f) throw new ErroCalc('Ferramenta desconhecida.');
   try { return f.calc(entrada ?? {}, P); } catch (e) { if (e instanceof ErroCalc) throw e; throw new ErroCalc('Não foi possível calcular com esses dados.'); }

@@ -16,6 +16,7 @@ export const CATEGORIAS: Record<string, { nome: string; fontes: string[] }> = {
   DCTFWEB: { nome: 'DCTFWeb', fontes: ['https://www.gov.br/receitafederal/pt-br/assuntos/orientacao-tributaria/declaracoes-e-demonstrativos/dctfweb'] },
   FGTS_DIGITAL: { nome: 'FGTS Digital', fontes: ['https://www.gov.br/trabalho-e-emprego/pt-br/assuntos/fgts-digital'] },
   LUCRO: { nome: 'Lucro Presumido / Retenções', fontes: ['https://www.gov.br/receitafederal/pt-br'] },
+  SST: { nome: 'SST / Segurança do Trabalho', fontes: ['https://www.gov.br/trabalho-e-emprego/pt-br/assuntos/inspecao-do-trabalho/seguranca-e-saude-no-trabalho/normas-regulamentadoras'] },
   OUTROS: { nome: 'Outros', fontes: [] },
 };
 const HOSTS_OK = /(^|\.)(gov\.br|planalto\.gov\.br|fazenda\.gov\.br|inss\.gov\.br|caixa\.gov\.br)$/i;
@@ -47,6 +48,30 @@ export const PADROES: P[] = [
       presuncao_csll: { comercio: 0.12, industria: 0.12, transporte_carga: 0.12, servicos: 0.32, servicos_hospitalares: 0.12, transporte_passageiros: 0.12 },
       irpj: 0.15, adicional: 0.10, adicional_limite_trimestre: 60000, csll: 0.09, pis: 0.0065, cofins: 0.03 }, vigencia_ini: '2015-01-01', observacao: 'Lei 9.249/95, 9.430/96. Reforma tributária pode alterar a partir de 2026–2033: acompanhe.' },
   { categoria: 'LUCRO', codigo: 'RETENCOES_PCC', descricao: 'Retenções federais sobre serviços (IRRF, CSLL, COFINS, PIS)', valor: { irrf: 0.015, csll: 0.01, cofins: 0.03, pis: 0.0065 }, vigencia_ini: '2003-01-01', observacao: 'Lei 10.833/03; dispensa de retenção abaixo de R$ 10,00.' },
+  { categoria: 'SST', codigo: 'SST_PARAMETROS', descricao: 'Parâmetros de SST: periodicidades e prazos usados pelas ferramentas',
+    valor: { aso_periodico_meses: 12, extintor_recarga_meses: 12, extintor_hidrostatico_anos: 5, cipa_mandato_meses: 24, cipa_edital_dias: 60, estabilidade_meses: 12, empresa_paga_dias: 15 }, vigencia_ini: '2022-01-01',
+    observacao: 'Valores usuais (NR-5, NR-7, Lei 8.213, NBR 12962). Confirme nas normas vigentes e ajuste se necessário.' },
+  { categoria: 'SST', codigo: 'AGENTES_RISCO', descricao: 'Catálogo de agentes físicos, químicos e biológicos (cor, unidade, limite de tolerância e metodologia) para o inventário de riscos',
+    valor: { FISICO: { cor: 'Verde', itens: [
+        { id: 'ruido_continuo', agente: 'Ruído contínuo ou intermitente', unidade: 'dB(A)', lt: '85 dB(A) para 8 h/dia', metodo: 'NHO 01 (Fundacentro) / dosimetria', lt_num: 85 },
+        { id: 'ruido_impacto', agente: 'Ruído de impacto', unidade: 'dB(Linear)', lt: '130 dB(Linear) ou 120 dB(C) em resposta rápida', metodo: 'Medidor de nível de pressão sonora em circuito de impacto' },
+        { id: 'calor', agente: 'Calor (sobrecarga térmica)', unidade: '°C (IBUTG)', lt: 'Conforme taxa metabólica (NR-15, Anexo 3)', metodo: 'NHO 06 (Fundacentro)' },
+        { id: 'vibracao', agente: 'Vibrações de mãos e braços (VMB) e corpo inteiro (VCI)', unidade: 'm/s² (AREN)', lt: 'VMB: 5 m/s² | VCI: 1,1 m/s² (VDVR 21 m/s^1,75)', metodo: 'NHO 09 e NHO 10 / ISO 2631 e ISO 5349' },
+        { id: 'rad_ionizante', agente: 'Radiações ionizantes', unidade: 'Sv / Gy', lt: 'Normas da CNEN', metodo: 'Dosimetria individual mensal obrigatória' },
+        { id: 'rad_nao_ionizante', agente: 'Radiações não ionizantes (micro-ondas, UV, laser)', unidade: 'W/m² / por espectro', lt: 'Critério qualitativo e limites ACGIH', metodo: 'Radiômetro / espectrorradiômetro' },
+        { id: 'frio_umidade_pressao', agente: 'Frio, umidade e pressões hiperbáricas', unidade: '°C / atm', lt: 'Critérios qualitativos e laudo de inspeção no local', metodo: 'Inspeção em campo e análise de tempos de descompressão' }] },
+      QUIMICO: { cor: 'Vermelho', fds: 'FDS (antiga FISPQ) conforme ABNT NBR 14725', itens: [
+        { id: 'poeira_mineral', agente: 'Poeiras minerais (sílica livre cristalizada, asbesto, carvão)', unidade: 'mg/m³ ou mppcf', lt: 'NR-15, Anexo 12', metodo: 'NHO 08 / bomba gravimétrica com ciclone de nylon' },
+        { id: 'gases_vapores', agente: 'Gases e vapores (CO, amônia, benzeno, tolueno, xileno)', unidade: 'ppm ou mg/m³', lt: 'NR-15, Anexo 11 (quadro 1)', metodo: 'Tubos colorimétricos, amostradores passivos ou tubos de carvão ativado' },
+        { id: 'nevoas_fumos', agente: 'Névoas, neblinas e fumos (névoa de ácido sulfúrico, fumos de solda)', unidade: 'mg/m³', lt: 'Definido por substância', metodo: 'Filtros de membrana (éster de celulose/PVC) em cassetes' }] },
+      BIOLOGICO: { cor: 'Marrom', metodo: 'Qualitativa (potencial epidemiológico e frequência de exposição)', itens: [
+        { id: 'bio_40', agente: 'Isolamento com doenças infectocontagiosas; carnes/vísceras/sangue de animais doentes; esgotos; lixo urbano', grau: 0.4, lt: 'Grau máximo (40%) – NR-15, Anexo 14' },
+        { id: 'bio_20', agente: 'Hospitais, ambulatórios, vacinação, laboratórios clínicos; necropsia; cemitérios; saúde animal', grau: 0.2, lt: 'Grau médio (20%) – NR-15, Anexo 14' }] } },
+    vigencia_ini: '2022-01-01', observacao: 'Catálogo conforme documento fornecido pelo cliente; confira NR-9, NR-15 (anexos) e NHOs vigentes.' },
+  { categoria: 'SST', codigo: 'TREINAMENTOS_NR', descricao: 'Catálogo de treinamentos: código → nome, carga inicial (h) e reciclagem (meses). Inclua os demais cursos da sua empresa.',
+    valor: { NR35: { nome: 'NR-35 Trabalho em altura', horas: 8, reciclagem_meses: 24 }, NR10: { nome: 'NR-10 Segurança em eletricidade', horas: 40, reciclagem_meses: 24 }, NR33: { nome: 'NR-33 Espaço confinado (trabalhador autorizado)', horas: 16, reciclagem_meses: 12 }, BRIGADA: { nome: 'Brigada de incêndio', horas: 16, reciclagem_meses: 12 }, CIPA: { nome: 'NR-5 Curso de CIPA', horas: 20, reciclagem_meses: 0 } },
+    vigencia_ini: '2022-01-01', observacao: 'Catálogo inicial a conferir; NR-20, NR-11, NR-12, NR-18 etc. dependem do conteúdo/ risco: cadastre conforme a norma.' },
+  { categoria: 'SST', codigo: 'COTA_PCD', descricao: 'Cota de PCD/reabilitados (art. 93 Lei 8.213): limite superior do nº de empregados, percentual', valor: { faixas: [[99, 0], [200, 0.02], [500, 0.03], [1000, 0.04], [null, 0.05]] }, vigencia_ini: '1991-07-24', observacao: 'Lei 8.213/91, art. 93.' },
   { categoria: 'ESOCIAL', codigo: 'ESOCIAL_PRAZOS', descricao: 'eSocial: fechamento da folha (S-1200/S-1210) e vencimento do DAE', valor: { fechamento_dia: 15, vencimento_dae_dia: 20, layout: 'S-1.3', antecipa_dia_util: true }, vigencia_ini: D26, observacao: 'Confira o Manual de Orientação do eSocial vigente.' },
   { categoria: 'DCTFWEB', codigo: 'DCTFWEB_PRAZOS', descricao: 'DCTFWeb: transmissão e vencimento do DARF/DAE', valor: { transmissao_dia: 15, vencimento_dia: 20, antecipa_dia_util: true, multa_min: 500, multa_dia_percentual: 0.02, multa_max_percentual: 0.20 }, vigencia_ini: D26, observacao: 'Prazos: confira IN RFB vigente.' },
   { categoria: 'FGTS_DIGITAL', codigo: 'FGTS_DIGITAL_PRAZOS', descricao: 'FGTS Digital: vencimento da guia mensal', valor: { vencimento_dia: 20, antecipa_dia_util: true, multa_primeiro_mes: 0.05, multa_apos: 0.10, juros_mes: 0.005 }, vigencia_ini: '2024-03-01', observacao: 'Obrigatório desde 03/2024. Confira regras de atraso no portal FGTS Digital.' },
