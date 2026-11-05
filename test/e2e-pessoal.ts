@@ -50,6 +50,13 @@ r = await C.r('POST', `/v1/empresas/${emp}/ambientes`, { codigo: 'AX', nome: 'X'
 r = await C.r('GET', `/v1/empresas/${emp}/cargos`); assert.equal(r.s, 200);
 r = await C.r('POST', '/v1/normas', { codigo: 'SM', valor: {} }); assert.equal(r.s, 403);
 r = await C.r('GET', '/v1/admin/usuarios'); assert.equal(r.s, 403);
+// Chave OpenAI: somente ADMIN cria/troca/remove; os demais apenas consultam o status
+r = await C.r('PUT', '/v1/ia/config', { apiKey: 'sk-TesteAbCdEf1234567890abcdefGHIJ', modelo: 'gpt-4o-mini' }); assert.equal(r.s, 403);
+r = await C.r('DELETE', '/v1/ia/config'); assert.equal(r.s, 403);
+r = await C.r('GET', '/v1/ia/config'); assert.equal(r.s, 200); assert.ok(!JSON.stringify(r.j).includes('sk-TesteAbCdEf'));
+r = await A.r('PUT', '/v1/ia/config', { apiKey: 'sk-TesteAbCdEf1234567890abcdefGHIJ', modelo: 'gpt-4o-mini', limiteTokensMes: 1000 }); assert.equal(r.s, 200, JSON.stringify(r.j)); assert.ok(!JSON.stringify(r.j).includes('sk-TesteAbCdEf1234'));
+r = await A.r('PUT', '/v1/ia/config', { apiKey: 'sk-OutraChaveXyZ9876543210abcdefKLMN', modelo: 'gpt-4o' }); assert.equal(r.s, 200);
+r = await A.r('DELETE', '/v1/ia/config'); assert.equal(r.s, 200);
 r = await A.r('POST', '/v1/admin/usuarios', { nome: 'Leitor', email: `l.${sfx}@t.com`, papel: 'CLIENTE_LEITURA', senha: SENHA }); assert.equal(r.s, 201);
 const L = new Cli(); r = await L.r('POST', '/auth/login', { email: `l.${sfx}@t.com`, senha: SENHA }); assert.equal(r.s, 200);
 r = await L.r('GET', `/v1/empresas/${emp}/funcionarios`); assert.equal(r.s, 200);

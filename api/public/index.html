@@ -65,12 +65,6 @@ dialog.pq{width:min(420px,95vw)}
 
 <section id="p-ia" class="hide">
 <div class="card"><h3 style="margin:0 0 8px">Agente de IA</h3>
-<div class="bar" style="border:0;padding:0" id="iaCfg">
-<label>Chave da OpenAI<input id="ikey" type="password" autocomplete="off" placeholder="sk-..." size="30"></label>
-<label>Modelo<input id="imod" size="16" value="gpt-4o-mini"></label>
-<label>Limite de tokens/mês<input id="ilim" type="number" min="0" value="200000" style="width:120px"></label>
-<button id="iSalvar">Salvar</button><button class="sec" id="iRemover">Remover chave</button></div>
-<p id="iStatus" class="mut" style="margin:8px 0"></p>
 <div id="chat" class="tw" style="padding:10px;max-height:280px"></div>
 <div style="display:flex;gap:8px;margin-top:8px"><input id="ipg" style="flex:1" placeholder="Pergunte: ex.: resuma o balancete de janeiro de 2025"><button id="iEnv">Enviar</button></div></div>
 </section>
@@ -88,11 +82,19 @@ dialog.pq{width:min(420px,95vw)}
 </section>
 
 <section id="p-adm" class="hide">
-<div class="tabs"><button class="sec sm" data-a="usu">Usuários</button><button class="sec sm" data-a="emp">Empresas</button><button class="sec sm" data-a="norm">Normas e tabelas</button></div>
+<div class="tabs"><button class="sec sm" data-a="usu">Usuários</button><button class="sec sm" data-a="emp">Empresas</button><button class="sec sm" data-a="norm">Normas e tabelas</button><button class="sec sm" data-a="ia">Configuração da IA</button></div>
 <div id="a-usu"><div class="bar"><button id="nUsu">+ Novo usuário</button></div>
 <div class="tw"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Situação</th><th>Último acesso</th><th>Ações</th></tr></thead><tbody id="tUsu"></tbody></table></div></div>
 <div id="a-emp" class="hide"><div class="bar"><button id="nEmp">+ Nova empresa</button></div>
 <div class="tw"><table><thead><tr><th>CNPJ</th><th>Razão social</th><th>UF</th><th>Regime</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="tEmp"></tbody></table></div></div>
+<div id="a-ia" class="hide"><div class="card"><h3 style="margin:0 0 8px">Configuração da IA (OpenAI)</h3><p class="mut" style="margin:0 0 8px">Somente administradores. A chave é guardada criptografada e nunca é exibida; para trocar, informe a nova e salve.</p>
+<div class="bar" style="border:0;padding:0" id="iaCfg">
+<label>Chave da OpenAI<input id="ikey" type="password" autocomplete="off" placeholder="sk-..." size="30"></label>
+<label>Modelo<input id="imod" size="16" value="gpt-4o-mini"></label>
+<label>Limite de tokens/mês<input id="ilim" type="number" min="0" value="200000" style="width:120px"></label>
+<button id="iSalvar">Salvar</button><button class="sec" id="iRemover">Remover chave</button></div>
+<p id="iStatus" class="mut" style="margin:8px 0"></p>
+</div></div>
 <div id="a-norm" class="hide">
 <div class="bar"><label>Categoria<select id="nCat"></select></label><button id="nNova">+ Nova norma</button><button class="sec" id="nHist">Histórico</button><button class="sec" id="nRest">Restaurar padrões</button></div>
 <div class="bar" id="nBotoes" style="flex-wrap:wrap"></div>
@@ -178,7 +180,7 @@ $('fch').onclick=()=>$('dlg').close();
 /* ---------- agente de IA ---------- */
 const hist=[];const bolha=(t,q)=>{const d=el('div',{textContent:(q==='u'?'Você: ':'IA: ')+t});d.style.cssText='margin:6px 0;white-space:pre-wrap;'+(q==='u'?'font-weight:600':'');$('chat').append(d);$('chat').scrollTop=1e9};
 const stat=c=>{$('iStatus').textContent=c.configurado?`Chave configurada (${c.origemChave}${c.chaveFinal?', final …'+c.chaveFinal:''}) · modelo ${c.modelo} · uso no mês: ${c.usoTokensMes}/${c.limiteTokensMes} tokens`:'Nenhuma chave configurada.'+(c.criptografiaDisponivel?'':' (servidor sem IA_MASTER_KEY: não é possível salvar chave)');$('imod').value=c.modelo;$('ilim').value=c.limiteTokensMes};
-async function carregarIA(){$('iaCfg').classList.toggle('hide',eu.papel!=='ADMIN');try{stat(await call('GET','/v1/ia/config'))}catch(e){err(e)}}
+async function carregarIA(){try{stat(await call('GET','/v1/ia/config'))}catch(e){err(e)}}
 $('iSalvar').onclick=async()=>{try{msg('');const b={modelo:$('imod').value,limiteTokensMes:Number($('ilim').value)};if($('ikey').value)b.apiKey=$('ikey').value;stat(await call('PUT','/v1/ia/config',b));$('ikey').value=''}catch(e){err(e)}};
 $('iRemover').onclick=async()=>{try{stat(await call('DELETE','/v1/ia/config'))}catch(e){err(e)}};
 $('iEnv').onclick=async()=>{const t=$('ipg').value.trim();if(!t||!$('emp').value)return;$('ipg').value='';hist.push({role:'user',content:t});bolha(t,'u');
@@ -189,7 +191,7 @@ const PAPEIS=[['ADMIN','Administrador'],['CONTADOR','Contador'],['AUXILIAR','Aux
 const REGIMES=[['SIMPLES_NACIONAL','Simples Nacional'],['LUCRO_PRESUMIDO','Lucro Presumido'],['LUCRO_REAL','Lucro Real'],['LUCRO_ARBITRADO','Lucro Arbitrado'],['IMUNE_ISENTA','Imune/Isenta']];
 const rot=(l,v)=>(l.find(x=>x[0]===v)||[0,v])[1];
 document.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>abaAdm(b.dataset.a));
-function abaAdm(a){for(const x of ['usu','emp','norm'])$('a-'+x).classList.toggle('hide',x!==a);a==='usu'?carregarUsu():a==='emp'?carregarEmp():carregarNormas()}
+function abaAdm(a){for(const x of ['usu','emp','norm','ia'])$('a-'+x).classList.toggle('hide',x!==a);a==='usu'?carregarUsu():a==='emp'?carregarEmp():a==='ia'?carregarIA():carregarNormas()}
 async function acao(fn,ok){try{msg('');await fn();if(ok)msg(ok,true)}catch(e){err(e)}}
 
 async function carregarUsu(){try{const l=await call('GET','/v1/admin/usuarios');
