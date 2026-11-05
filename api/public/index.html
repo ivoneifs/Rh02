@@ -1,6 +1,7 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ERP Contábil</title>
-<style>
+<style>.sim{grid-column:1/-1;margin:0 0 6px;padding:8px;border:1px dashed #cbd5e1;border-radius:8px;background:#f8fafc}
+
 :root{--bg:#f6f7fb;--fg:#1b2333;--mut:#667;--card:#fff;--line:#e3e6ef;--pri:#1d4ed8;--side:#0f1b3d;--err:#c0392b;--ok:#1a7f4b}
 @media(prefers-color-scheme:dark){:root{--bg:#0e1424;--fg:#e8ebf5;--mut:#9aa3bd;--card:#151d33;--line:#263253;--pri:#6b93ff;--side:#0a1020;--err:#ff7b6b;--ok:#4cc38a}}
 *{box-sizing:border-box}body{margin:0;font:14px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
@@ -224,6 +225,15 @@ function abrirForm(titulo,nodes,aoSalvar,grid){document.getElementById('frmDel')
  $('frmF').onsubmit=async ev=>{ev.preventDefault();try{await aoSalvar();$('frm').close()}catch(e){$('frmM').textContent=e.message}};$('frmX').onclick=()=>$('frm').close();$('frm').showModal()}
 const inCampo=c=>{let i;if(c.t==='sel')i=el('select',{},...c.op.map(([v,t])=>el('option',{value:v,textContent:t})));else if(c.t==='bool'){i=el('input',{type:'checkbox'});i.checked=!!c.v}else if(c.t==='area'){i=el('textarea',{rows:3})}else i=el('input',{type:c.t==='data'?'date':'text',inputMode:c.t==='num'?'decimal':'text'});if(c.t!=='bool')i.value=c.v??'';return i};
 const valCampo=(c,i)=>c.t==='bool'?i.checked:i.value;
+/* "Gerar simulação com IA": preenche o formulário com exemplo fictício e explica cada campo (nada é gravado) */
+function blocoSimulacao(f,ins,aoPreencher){const box=el('div',{className:'sim'});const cen=el('input',{placeholder:'Cenário (opcional): ex.: operador de produção com 3 dependentes',style:'flex:1;min-width:180px'});
+ const bt=el('button',{className:'sec',textContent:'✨ Gerar simulação com IA'});const msgEl=el('p',{className:'mut',style:'margin:4px 0'});const ex=el('div',{});
+ bt.onclick=async()=>{bt.disabled=true;msgEl.className='mut';msgEl.textContent='Gerando simulação…';ex.replaceChildren();try{const r=await call('POST','/v1/ferramentas/'+f.id+'/simular',{cenario:cen.value||undefined});
+  for(const c of f.campos){const v=r.valores[c.n];if(v===undefined||!ins[c.n])continue;if(c.t==='bool')ins[c.n].checked=!!v;else ins[c.n].value=String(v)}
+  msgEl.textContent=(r.resumo||'Simulação preenchida com dados fictícios.')+' Confira e ajuste os valores antes de usar.';
+  if(r.explicacao.length){const nm=Object.fromEntries(f.campos.map(c=>[c.n,c.l]));const ul=el('ul',{style:'margin:4px 0 0 18px;padding:0'});for(const x of r.explicacao)ul.append(el('li',{textContent:(nm[x.campo]||x.campo)+': '+x.como}));ex.replaceChildren(el('details',{open:true},el('summary',{textContent:'Como preencher cada campo'}),ul))}
+  if(aoPreencher)aoPreencher()}catch(e){if(e.status===401)return mostrarAuth();msgEl.className='msg';msgEl.textContent=e.message}finally{bt.disabled=false}};
+ box.append(el('div',{className:'bar',style:'margin:0;border:0;padding:0'},bt,cen),msgEl,ex);return box}
 const nomeFerr=id=>(FERR||[]).find(f=>f.id===id)?.nome||id;
 async function garantirFerr(){if(!FERR)FERR=await call('GET','/v1/ferramentas');return FERR}
 
@@ -283,10 +293,12 @@ function abrirFerr(f){const C=$('fdC');if(f.tipo==='registro')return abrirRegist
  const pk=pickerFunc((fn,e)=>{sel=fn;emp=e;if(!fn)return;for(const [k,src] of Object.entries(AUTO)){if(!src||!ins[k])continue;let v=fn[src];if(v==null||v==='')continue;ins[k].value=k==='deps'?v:(k==='adm'||k==='nasc')?d10(v):v}if(ins.doc&&ins.doc.type==='text')ins.doc.value=fn.cpf;if(ins.tipo&&0)0});
  const out=el('div',{});const bt=el('button',{textContent:'Calcular'}),bs=el('button',{className:'sec',textContent:'Salvar na ficha',disabled:true});
  bt.onclick=async()=>{try{const e={};for(const c of f.campos)e[c.n]=valCampo(c,ins[c.n]);const r=await call('POST','/v1/ferramentas/'+f.id,e);ult={e,r};bs.disabled=false;
-  const t=el('table');t.append(...r.linhas.map(l=>{const tr=el('tr',{className:l.forte?'s':''});tr.append(td(l.r),td(FMT[l.f](l.v),'n'));tr.cells[1].style.whiteSpace='normal';return tr}));out.replaceChildren(t,...(r.aviso?[el('p',{className:'mut',textContent:r.aviso})]:[]))}catch(x){if(x.status===401)return mostrarAuth();out.replaceChildren(el('p',{className:'msg',textContent:x.message}))}};
+  const t=el('table');t.append(...r.linhas.map(l=>{const tr=el('tr',{className:l.forte?'s':''});tr.append(td(l.r),td(FMT[l.f](l.v),'n'));tr.cells[1].style.whiteSpace='normal';return tr}));const bx=el('button',{className:'sec sm',textContent:'💡 Explicar o cálculo',style:'margin-top:8px'}),ex=el('div',{className:'mut',style:'white-space:pre-wrap;margin-top:6px'});
+  bx.onclick=async()=>{bx.disabled=true;ex.textContent='Gerando explicação…';try{ex.textContent=(await call('POST','/v1/ferramentas/'+f.id+'/explicar',e)).explicacao}catch(x2){if(x2.status===401)return mostrarAuth();ex.className='msg';ex.textContent=x2.message}finally{bx.disabled=false}};
+  out.replaceChildren(t,...(r.aviso?[el('p',{className:'mut',textContent:r.aviso})]:[]),bx,ex)}catch(x){if(x.status===401)return mostrarAuth();out.replaceChildren(el('p',{className:'msg',textContent:x.message}))}};
  bs.onclick=async()=>{try{if(!ult)return;if(!emp&&!sel)return out.append(el('p',{className:'msg',textContent:'Escolha a empresa (e, se quiser, o funcionário) para guardar o resultado.'}));
   await call('POST','/v1/registros',{ferramenta:f.id,empresa_id:emp||undefined,funcionario_id:sel?.id,titulo:f.nome+(sel?' – '+sel.nome:''),data_evento:hoje(),dados:{entrada:ult.e,resultado:ult.r.linhas}});out.append(el('p',{className:'msg ok',textContent:'Resultado guardado no banco (ficha do funcionário / histórico da ferramenta).'}))}catch(x){out.append(el('p',{className:'msg',textContent:x.message}))}};
- C.replaceChildren(el('h3',{textContent:f.nome,style:'margin:0'}),el('div',{className:'mut',textContent:f.desc}),pk.node,form,el('div',{className:'bar',style:'margin:0;border:0;padding:0'},bt,bs),out);
+ C.replaceChildren(el('h3',{textContent:f.nome,style:'margin:0'}),el('div',{className:'mut',textContent:f.desc}),pk.node,blocoSimulacao(f,ins),form,el('div',{className:'bar',style:'margin:0;border:0;padding:0'},bt,bs),out);
  el('div');$('fdlg').showModal();
  // histórico guardado desta ferramenta
 }
@@ -306,6 +318,7 @@ async function formReg(f,r,aposSalvar){const R=f.registro||{};await empresas();c
  const ti=el('input',{value:r?.titulo||''}),de=el('input',{type:'date',value:d10(r?.data_evento)||hoje()}),dv=el('input',{type:'date',value:d10(r?.data_validade)}),st=el('select',{},...[['ABERTO','Aberto'],['CONCLUIDO','Concluído'],['CANCELADO','Cancelado']].map(([v,t])=>el('option',{value:v,textContent:t})));st.value=r?.status||'ABERTO';
  nodes.push(el('label',{},'Título / referência',ti),el('label',{},R.data||'Data',de));if(R.validade)nodes.push(el('label',{},R.validade,dv));nodes.push(el('label',{},'Situação',st));
  for(const c of f.campos){const cc={...c,v:d[c.n]??c.v};ins[c.n]=inCampo(cc);if(c.t==='bool')ins[c.n].checked=!!(d[c.n]??c.v);nodes.push(el('label',{},c.l,ins[c.n]))}
+ nodes.unshift(blocoSimulacao(f,ins));
  abrirForm((r?'Editar – ':'Novo – ')+f.nome,nodes,async()=>{const dados={};for(const c of f.campos)dados[c.n]=valCampo(c,ins[c.n]);
   const b={ferramenta:f.id,empresa_id:se.value||null,funcionario_id:R.func?(sf.value||null):null,titulo:ti.value||null,data_evento:de.value||null,data_validade:dv.value||null,status:st.value,dados};
   if(!b.empresa_id&&!b.funcionario_id)throw new Error('Escolha a empresa'+(R.func?' e o funcionário.':'.'));

@@ -14,7 +14,8 @@ import * as auth from './auth.ts';
 import * as normas from './normas.ts';
 import * as pessoal from './pessoal.ts';
 import * as registros from './registros.ts';
-import { catalogo, executar } from './catalogo.ts';
+import { catalogo, executar, TODAS } from './catalogo.ts';
+import { simular, explicar } from './simulacao.ts';
 import { ErroCalc } from './ferramentas.ts';
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -81,6 +82,8 @@ const server = http.createServer(async (req, res) => {
       if (p === '/v1/registros' && req.method === 'GET') return json(res, 200, await registros.listar(s, { ferramenta: qp.get('ferramenta') ?? undefined, empresa: qp.get('empresa') ?? undefined, funcionario: qp.get('funcionario') ?? undefined, status: qp.get('status') ?? undefined }));
       if (p === '/v1/registros' && req.method === 'POST') return json(res, 201, await registros.criar(s, await corpo()));
       if ((m = /^\/v1\/registros\/([^/]+)$/.exec(p))) { if (req.method === 'PATCH') return json(res, 200, await registros.editar(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await registros.excluir(s, m[1])); }
+      if ((m = /^\/v1\/ferramentas\/([a-z0-9_]+)\/simular$/i.exec(p)) && req.method === 'POST') { const f = TODAS.find(x => x.id === m![1]); if (!f) return json(res, 404, { erro: 'ferramenta desconhecida' }); const b = await corpo(); return json(res, 200, await simular(s, f, b?.cenario)); }
+      if ((m = /^\/v1\/ferramentas\/([a-z0-9_]+)\/explicar$/i.exec(p)) && req.method === 'POST') { const f = TODAS.find(x => x.id === m![1]); if (!f) return json(res, 404, { erro: 'ferramenta desconhecida' }); return json(res, 200, await explicar(s, f, await corpo(), await normas.vigentes(s), executar)); }
       if (p === '/v1/ferramentas' && req.method === 'GET') return json(res, 200, catalogo());
       if ((m = /^\/v1\/ferramentas\/([a-z0-9_]+)$/i.exec(p)) && req.method === 'POST') return json(res, 200, executar(m[1], await corpo(), await normas.vigentes(s)));
       if (p === '/v1/normas/categorias' && req.method === 'GET') return json(res, 200, Object.entries(normas.CATEGORIAS).map(([id, c]) => ({ id, ...c })));
