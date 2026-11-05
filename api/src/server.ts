@@ -18,6 +18,7 @@ import { catalogo, executar, TODAS } from './catalogo.ts';
 import { simular, explicar } from './simulacao.ts';
 import * as sugestao from './sugestao.ts';
 import { TERMOS } from './glossario.ts';
+import * as anexos from './anexos.ts';
 import { controle as controleSst } from './controle.ts';
 import { catalogo as modelos, redigir as redigirModelo, AVISO as AVISO_DOC } from './modelos-catalogo.ts';
 import * as dadosTeste from './dadostestes.ts';
@@ -49,7 +50,7 @@ const dataOk = (s: unknown): s is string => typeof s === 'string' && /^\d{4}-\d{
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? '/', 'http://x'); const p = url.pathname;
-    if (p === '/' || p === '/index.html') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'x-frame-options': 'DENY', 'content-security-policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'" }); return res.end(INDEX); }
+    if (p === '/' || p === '/index.html') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'x-frame-options': 'DENY', 'content-security-policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' blob: data:" }); return res.end(INDEX); }
     if (p === '/health') { await pool.query('SELECT 1'); return json(res, 200, { ok: true }); }
     const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '').split(',').pop()!.trim();
     const mutante = req.method !== 'GET' && req.method !== 'HEAD';
@@ -75,7 +76,7 @@ const server = http.createServer(async (req, res) => {
 
     let m: RegExpExecArray | null;
     // Ferramentas de cálculo (qualquer papel logado) e Normas (leitura: todos; alteração: ADMIN)
-    if (p.startsWith('/v1/ferramentas') || p.startsWith('/v1/modelos') || p === '/v1/glossario' || p === '/v1/semaforo' || p === '/v1/sugestao/condicoes' || /^\/v1\/registros\/[^/]+\/analisar$/.test(p) || p.startsWith('/v1/normas') || p.startsWith('/v1/registros') || p.startsWith('/v1/funcionarios') || p.startsWith('/v1/cargos') || p.startsWith('/v1/ambientes') || /^\/v1\/empresas\/[^/]+\/(funcionarios|cargos|ambientes)$/.test(p)) {
+    if (p.startsWith('/v1/ferramentas') || p.startsWith('/v1/modelos') || p.startsWith('/v1/anexos') || p === '/v1/glossario' || p === '/v1/semaforo' || p === '/v1/sugestao/condicoes' || /^\/v1\/registros\/[^/]+\/analisar$/.test(p) || p.startsWith('/v1/normas') || p.startsWith('/v1/registros') || p.startsWith('/v1/funcionarios') || p.startsWith('/v1/cargos') || p.startsWith('/v1/ambientes') || /^\/v1\/empresas\/[^/]+\/(funcionarios|cargos|ambientes)$/.test(p)) {
       const s = await auth.sessaoDe(req); if (!s) return json(res, 401, { erro: 'não autenticado' });
       const corpo = async () => JSON.parse(await lerCorpo(req, 200_000));
       const qp = url.searchParams;
@@ -91,6 +92,13 @@ const server = http.createServer(async (req, res) => {
         if (req.method !== 'GET' && new RegExp(`^/v1/(empresas/[^/]+/)?${rota}(/|$)`).test(p) && s.papel !== 'ADMIN') return json(res, 403, { erro: 'Apenas administradores alteram cargos e ambientes (configuração).' });
         if ((m = new RegExp(`^/v1/empresas/([^/]+)/${rota}$`).exec(p))) { if (req.method === 'GET') return json(res, 200, await mod.listar(s, m[1])); if (req.method === 'POST') return json(res, 201, await mod.criar(s, m[1], await corpo())); }
         if ((m = new RegExp(`^/v1/${rota}/([^/]+)$`).exec(p))) { if (req.method === 'PATCH') return json(res, 200, await mod.editar(s, m[1], await corpo())); if (req.method === 'DELETE') return json(res, 200, await mod.excluir(s, m[1])); }
+      }
+      if (p === '/v1/anexos' && req.method === 'POST') return json(res, 201, await anexos.enviar(s, JSON.parse(await lerCorpo(req, 3_500_000))));
+      if (p === '/v1/anexos' && req.method === 'GET') return json(res, 200, await anexos.listar(s, qp.get('alvo_tipo') ?? '', qp.get('alvo_id') ?? ''));
+      if ((m = /^\/v1\/anexos\/([^/]+)$/.exec(p))) {
+        if (req.method === 'GET') { const f = await anexos.obter(s, m[1]); res.writeHead(200, { 'content-type': f.mime, 'content-length': f.dados.length, 'cache-control': 'private, max-age=300', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox", 'content-disposition': 'inline' }); return res.end(f.dados); }
+        if (req.method === 'PATCH') return json(res, 200, await anexos.legenda(s, m[1], (await corpo())?.legenda));
+        if (req.method === 'DELETE') return json(res, 200, await anexos.excluir(s, m[1]));
       }
       if (p === '/v1/glossario' && req.method === 'GET') return json(res, 200, TERMOS);
       if (p === '/v1/modelos' && req.method === 'GET') return json(res, 200, { aviso: AVISO_DOC, modelos: modelos() });
